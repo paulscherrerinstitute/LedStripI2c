@@ -68,7 +68,7 @@ class LedStrip:
       time.sleep(sleepTime)
       lastGray = newGray
 
-  def test(self, termCount = (1<<16)):
+  def test(self, termCount = (1<<16), sleepTime=0.01):
     self.setCtrl(0xffffffff)
     for i in range(0xa0):
       self.setPwdIref( 0xff, i )
@@ -77,11 +77,12 @@ class LedStrip:
       self.setPwdIref( i, 0xa0 )
       time.sleep(0.01)
     self.setPwdIref(0x60, 0xc0)
-    self.setCtrl(0x55555555)
-    time.sleep(1.0)
-    self.setCtrl(0xaaaaaaaa)
-    time.sleep(1.0)
-    self.grayCount( termCount, 0.2 )
+    for i in range(2):
+      self.setCtrl(0x55555555)
+      time.sleep(3.0)
+      self.setCtrl(0xaaaaaaaa)
+      time.sleep(3.0)
+    self.grayCount( termCount, sleepTime )
     
 
 if "__main__" == __name__:
@@ -90,4 +91,4 @@ if "__main__" == __name__:
   with usb1.USBContext() as ctx:
     mcp = Mcp2221I2c( ctx )
     led = LedStrip(mcp)
-    led.test()
+    led.test((1<<30))
