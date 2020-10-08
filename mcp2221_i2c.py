@@ -152,7 +152,21 @@ class Mcp2221I2c:
   def setOffsetAndRead(self, addr, off, data, siz = -1):
     self.sendStartWrite(addr, [off], siz=-1, sendStop=False)
     self.sendStartRead (addr, data , siz=-1, restart =True )
-	
 
-ctx = usb1.USBContext()
-mcp = Mcp2221I2c( ctx )
+  def getFlashChipSettings(self):
+    buf    = self._getBuf()
+    # all zeros in buf now
+    buf[0] = 0xB0
+    buf[1] = 0x00
+    self._xfer(buf, buf)
+    if 0 != buf[1]:
+      raise RuntimeError("MCP2221.getFlashChipSettings(): command not supported")
+    return buf
+
+  def printFlashChipSettings(self, buf=None):
+    if buf is None:
+      buf = self.getFlashChipSettings()
+    print("Vendor  ID: {:04x}".format  ( (buf[ 9]<<8) | buf[ 8] ))
+    print("Product ID: {:04x}".format  ( (buf[11]<<8) | buf[10] ))
+    print("Power attr:   {:02x}".format( buf[12]                ))
+    print("Current/mA:  {:d}".format   ( buf[13]*2              ))
