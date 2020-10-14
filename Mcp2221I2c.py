@@ -161,12 +161,58 @@ class Mcp2221I2c:
     self._xfer(buf, buf)
     if 0 != buf[1]:
       raise RuntimeError("MCP2221.getFlashChipSettings(): command not supported")
-    return buf
+    return buf[4:4+buf[2]]
+
+  def getChipSettingsVIDPID(self, settings):
+    vid = (settings[5]<<8) | settings[4]
+    pid = (settings[7]<<8) | settings[6]
+    return vid, pid
+
+  def getChipSettingsmA(self, settings):
+    return 2*settings[9]
+
+  def setChipSettingsmA(self, settings, mA):
+    if mA < 0 or mA > 510:
+      raise RuntimeError("Mcp2221A.setChipSettingsmA() - invalid argument")
+    settings[9] = int( (mA + 1)/2 )
+
+  def progFlashChipSettingsmA(self, mA):
+    settings = self.getFlashChipSettings()
+    self.setChipSettingsmA(settings, mA)
+    self.progFlashChipSettings(settings)
+
+  def progFlashChipSettings(self, settings, force=False, password=None):
+    if (settings[0] & 2) != 0:
+      raise RuntimeError("Security bits will PERMANENTLY LOCK - refusing to change chip settings")
+    if not force:
+      vid, pid = self.getChipSettingsVIDPID(settings)
+      if vid != 0x4d8 or pid != 0xdd:
+        raise RuntimeError("Unexpected VID/PID - refusing to change chip settings")
+      if (settings[0] & 3) != 0:
+        if (settings[1]    ) != 0:
+          raise RuntimeError("Password ENABLED - refusing to change chip settings")
+    buf = self._getBuf()
+    buf[0]    = 0xb1
+    buf[1]    = 0x00
+    buf[2:12] = settings
+    if not password is None:
+      buf[12:20] = password
+    self._xfer(buf, buf)
+    if buf[1] != 0x00:
+      if 0x02 == buf[1]:
+        raise RuntimeError("Mcp2221A.setFlashChipSettings() ERROR: command not supported")
+      elif 0x03 == buf[1]:
+        raise RuntimeError("Mcp2221A.setFlashChipSettings() ERROR: command not allowed")
+      else:
+        raise RuntimeError("Mcp2221A.setFlashChipSettings() ERROR: unknown error")
 
   def printFlashChipSettings(self, buf=None):
     if buf is None:
       buf = self.getFlashChipSettings()
-    print("Vendor  ID: {:04x}".format  ( (buf[ 9]<<8) | buf[ 8] ))
-    print("Product ID: {:04x}".format  ( (buf[11]<<8) | buf[10] ))
-    print("Power attr:   {:02x}".format( buf[12]                ))
-    print("Current/mA:  {:d}".format   ( buf[13]*2              ))
+    vid, pid = self.getChipSettingsVIDPID(buf)
+    mA       = self.getChipSettingsmA(buf)
+    print("Struct Len: {:4d}".format   ( len(buf) ))
+    print("Vendor  ID: {:04x}".format  ( vid      ))
+    print("Product ID: {:04x}".format  ( pid      ))
+    print("Power attr:   {:02x}".format( buf[ 8]  ))
+    print("Current/mA: {:4d}".format   ( mA       ))
