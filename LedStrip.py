@@ -44,12 +44,15 @@ class LedStrip:
     if self.nLeds_ <= 16:
       if len(pwm) > 0:
         pwm.extend([0 for i in range(16 - self.nLeds_)])
+      self.i2c_.drain()
       self.i2c_.sendStartWrite( self.i2cAddrRight_, h + pwm + iref )
     else:
       if len(pwm) > 0:
         pwm.extend([0 for i in range(32 - self.nLeds_)])
-      self.i2c_.sendStartWrite( self.i2cAddrRight_, h + pwm[ 0:16] + iref[0 :16         ] )
-      self.i2c_.sendStartWrite( self.i2cAddrLeft_ , h + pwm[16:32] + iref[16:self.nLeds_] )
+      self.i2c_.drain()
+      self.i2c_.sendStartWrite( self.i2cAddrRight_, h + pwm[ 0:16] + iref[0 :16         ], sendStop=False )
+      self.i2c_.drain()
+      self.i2c_.sendStartWrite( self.i2cAddrLeft_ , h + pwm[16:32] + iref[16:self.nLeds_], restart=True )
 
   @staticmethod
   def _getIdxShft(i):
@@ -66,8 +69,10 @@ class LedStrip:
         self.ctlRight_[ idx ] |= (2 << shf)
       if ( ctrl & (1<<(i+16)) ):
         self.ctlLeft_ [ idx ] |= (2 << shf)
-    self.i2c_.sendStartWrite(self.i2cAddrRight_, self.ctlRight_)
-    self.i2c_.sendStartWrite(self.i2cAddrLeft_ , self.ctlLeft_ )
+    self.i2c_.drain()
+    self.i2c_.sendStartWrite(self.i2cAddrRight_, self.ctlRight_, sendStop=False)
+    self.i2c_.drain()
+    self.i2c_.sendStartWrite(self.i2cAddrLeft_ , self.ctlLeft_ , restart =True )
 
   def flipCtrl(self, bitNo, op = 0):
     if bitNo > 16:
@@ -87,6 +92,7 @@ class LedStrip:
     else:
       v ^= (2<<shf)
     c[idx] = v
+    self.i2c_.drain()
     self.i2c_.sendStartWrite(a, c)
 
   def grayCount(self, n, sleepTime=0.5):

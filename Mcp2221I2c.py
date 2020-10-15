@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 import usb1
+import time
 
 class I2cBusBusyError(RuntimeError):
   def __init__(self, msg):
@@ -9,7 +10,7 @@ class I2cBusBusyError(RuntimeError):
 class Mcp2221I2c:
   MICROCHIP_VENDOR_ID = 0x04d8
   MCP2221A_PRODUCT_ID = 0x00dd
-  MCP2221A_SYSFREQ    = 12000000
+  MCP2221A_SYSFREQ    = 12000000.0
   BUF_LEN             = 64
   def __init__(self, ctx):
     self.ctx_ = ctx
@@ -59,7 +60,15 @@ class Mcp2221I2c:
       raise RuntimeError("MCP2221A._xfer: not all data read")
     obuf[:] = newb[:]
 
-  def getStatus(self, buf, cancel = False, speed = 0):
+  # The nominal max. i2c speed of the MCP2221A is 400kHz; typically it seems
+  # to max out around 500kHz (i.e., by setting a small divider the effective
+  # i2c clock speed still does not increase above ~500kHz)
+  # The default divider is 20 which should yield a freq. of 600kHz but in
+  # practice is less than that...
+  def getStatus(self, buf = None, cancel = False, speed = 0):
+    if cancel and 0 != speed:
+      # Speed has no effect if 'cancel' is true
+      raise RuntimeError("MCP2221A.getStatus(): cancel must be False when changing speed")
     if buf is None:
       buf = self._getBuf()
     buf[0:5] = bytes(5)
@@ -68,13 +77,16 @@ class Mcp2221I2c:
       buf[2] = 0x10
     if 0 != speed:
       buf[3] = 0x20
-      buf[4] = self.MCP2221A_SYSFREQ / speed
+      buf[4] = round(self.MCP2221A_SYSFREQ / float(speed))
     self._xfer( buf )
 
-  def getStatusPrint(self, cancel = False, speed = 0):
-    buf = self._getBuf()
+  def printStatus(self, buf = None, cancel = False, speed = 0):
+    if buf is None:
+      buf = self._getBuf()
     self.getStatus(buf, cancel, speed)   
 
+    print("Requested Length     : {:d}".format( (buf[10]<<8) | buf[ 9]));
+    print("Transferred Length   : {:d}".format( (buf[12]<<8) | buf[11]));
     print("Current data buf cntr: {:d}".format( buf[13] ));
     print("Current speed divider: {:d}".format( buf[14] ));
     print("Current i2c timeout  : {:d}".format( buf[15] ));
@@ -84,18 +96,31 @@ class Mcp2221I2c:
 
   def drain(self):
     buf     = self._getBuf()
-    buf[13] = 1
-    while 0 != buf[13]:
+    #buf[13] = 1
+    #while 0 != buf[13]:
+    then    = time.clock_gettime(time.CLOCK_MONOTONIC);
+    buf[9]  = 1
+    while buf[9] != buf[11] or buf[10] != buf[12]:
       self.getStatus( buf )
+      now  = time.clock_gettime(time.CLOCK_MONOTONIC);
+      if now - then > 2.0:
+        self.printStatus(buf)
+        raise RuntimeError("Mcp2221A.drain(): timeout");
 
-  def sendStartWrite(self, addr, data, siz = -1, sendStop=True):
+  def sendStartWrite(self, addr, data, siz = -1, sendStop=True, restart=False):
+    if not sendStop and restart:
+      # not supported by MCP2221A
+      raise RuntimeError("Mcp2221A.sendStartWrite(): invalid args; cannot restart w/o stop")
     buf = self._getBuf()
     if (siz < 0 or siz > len(data)):
       siz = len(data)
     if ( siz > 60 ):
       raise RuntimeError("Transfers > 60 bytes currently not supported")
     if sendStop:
-      buf[0] = 0x90
+      if restart:
+        buf[0] = 0x92
+      else:
+        buf[0] = 0x90
     else:
       buf[0] = 0x94
     buf[1] = (siz >> 0) & 0xff
