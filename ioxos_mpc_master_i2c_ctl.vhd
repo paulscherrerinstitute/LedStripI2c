@@ -18,8 +18,6 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
-use ieee.std_logic_unsigned.all;
-use ieee.std_logic_arith.all;
 use ieee.numeric_std.all;
 
 use work.ioxos_mpc_master_i2c_ctl_pkg.all;
@@ -237,78 +235,78 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
   -- NOTE: values taken from Freescale reference manual, see table on page 818
   -- in [1]
   --
-  type fdr_reg_to_value_rom_type is array (0 to 63) of std_logic_vector(16 downto 0);
+  type fdr_reg_to_value_rom_type is array (0 to 63) of unsigned(16 downto 0);
 
   signal fdr_reg_to_value               : fdr_reg_to_value_rom_type := (
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x00 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x01 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x02 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x03 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x04 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x05 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x06 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x07 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x08 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x09 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0A - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0B - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0C - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0D - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0E - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0F - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x10 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x11 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x12 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x13 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x14 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x15 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x16 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x17 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x18 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x19 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1A - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1B - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1C - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1D - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1E - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1F - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x20 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x21 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x22 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x23 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x24 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x25 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x26 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x27 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x28 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x29 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2A - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2B - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2C - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2D - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2E - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2F - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x30 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x31 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x32 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x33 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x34 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x35 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x36 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x37 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x38 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x39 - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3A - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3B - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3C - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3D - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3E - 2, 17),
-    conv_std_logic_vector(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3F - 2, 17));
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x00 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x01 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x02 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x03 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x04 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x05 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x06 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x07 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x08 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x09 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0A - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0B - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0C - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0D - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0E - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x0F - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x10 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x11 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x12 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x13 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x14 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x15 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x16 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x17 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x18 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x19 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1A - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1B - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1C - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1D - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1E - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x1F - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x20 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x21 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x22 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x23 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x24 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x25 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x26 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x27 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x28 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x29 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2A - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2B - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2C - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2D - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2E - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x2F - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x30 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x31 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x32 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x33 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x34 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x35 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x36 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x37 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x38 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x39 - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3A - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3B - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3C - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3D - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3E - 2, 17),
+    to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3F - 2, 17));
 
   -- prescaler down counter and tick signal
-  signal current_prescaler_value        : std_logic_vector(16 downto 0) := (others => '0');
-  signal next_prescaler_value           : std_logic_vector(16 downto 0);
-  signal prescaler_init_value           : std_logic_vector(16 downto 0);
+  signal current_prescaler_value        : unsigned(16 downto 0) := (others => '0');
+  signal next_prescaler_value           : unsigned(16 downto 0);
+  signal prescaler_init_value           : unsigned(16 downto 0);
   alias  prescaler_tick                 : std_logic is current_prescaler_value(16);
 
   -----------------------------------------------------------------------------
@@ -394,8 +392,8 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
   signal current_bit_receiver_data      : std_logic_vector(9 downto 0) := (others => '0');
   signal next_bit_receiver_data         : std_logic_vector(9 downto 0);
 
-  signal current_bit_receiver_length    : std_logic_vector(3 downto 0) := (others => '0');
-  signal next_bit_receiver_length       : std_logic_vector(3 downto 0);
+  signal current_bit_receiver_length    : unsigned(3 downto 0)         := (others => '0');
+  signal next_bit_receiver_length       : unsigned(3 downto 0);
 
   -----------------------------------------------------------------------------
   -- bus snooper
@@ -471,7 +469,6 @@ begin
         ila_DATAs <= ila_DATA;
       end if;
     end process debug_SYNCH_PROC;
-  end generate GEN_ILA;
 
   ila_TRIG <= ila_DATA(9) &             -- [15] CR MSTA
               ila_DATA(10) &            -- [14] CR RSTA
@@ -509,6 +506,7 @@ begin
   ila_DATA(30) <= prescaler_tick;
 
   ila_DATA(31) <= i2creg_RDSTRB;
+  end generate GEN_ILA;
 
   -----------------------------------------------------------------------------
   -- status
@@ -721,7 +719,7 @@ begin
   end process prescaler_COMBO_PROC;
 
 
-  prescaler_init_value <= fdr_reg_to_value(conv_integer(i2c_fdr));
+  prescaler_init_value <= fdr_reg_to_value(to_integer(unsigned(i2c_fdr)));
 
   -----------------------------------------------------------------------------
   -- controller
