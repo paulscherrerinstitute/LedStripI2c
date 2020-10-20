@@ -23,6 +23,8 @@ architecture sim of i2ctb is
     );
   end component i2cRamSlave;
 
+  constant I2C_ADDR_C : std_logic_vector(6 downto 0) := "1010000";
+
   signal SDA, SCL : std_logic;
 
   signal SDAo     : std_logic := '1';
@@ -35,6 +37,7 @@ architecture sim of i2ctb is
   signal clk      : std_logic := '0';
   signal rst      : std_logic := '1';
   signal irq      : std_logic;
+  signal bsy      : std_logic;
 
   signal wrstrb   : std_logic := '0';
   signal we0      : std_logic_vector( 3 downto  0) := (others => '0');
@@ -139,12 +142,17 @@ begin
       wait until rising_edge( clk );
     end procedure wrb;
 
-    procedure rd(constant baddr : natural range 0 to 11) is
+    procedure rd(constant baddr : natural range 0 to 11; constant strobe : boolean) is
       variable b : natural range 0 to 3;
     begin
       b := baddr mod 4;
       rdsel <= std_logic_vector( to_unsigned( baddr/4, rdsel'length ) );
-      rdstrb <= '1';
+      if ( strobe ) then
+        -- hack: this triggers a read-shift operation
+        -- if we don't strobe then we can read the result of the previous shift
+        -- without initiating a new one...
+        rdstrb <= '1';
+      end if;
       wait until rising_edge( clk );
       rdstrb <= '0';
       wait until rising_edge( clk );
@@ -161,6 +169,73 @@ begin
       wrb( ST_REG, x"FF" and not ST_MIF );
     end procedure pend;
 
+    procedure send_data(constant data : std_logic_vector(7 downto 0)) is
+    begin
+      wrb( DATA_REG, data );
+      pend;
+    end procedure send_data;
+
+    procedure send_start(constant addr : std_logic_vector(6 downto 0); constant restart, read: boolean) is
+      variable v : std_logic_vector(7 downto 0);
+    begin
+      v := CR_INI or CR_MSTA;
+      if ( not read ) then
+        v := v or CR_MTX;
+      end if;
+      if ( restart ) then
+        v := v or CR_RSTA;
+      end if;
+      wrb( CR_REG, v );
+      v := addr & '0';
+      if ( read ) then
+        v(0) := '1';
+      end if;
+      send_data( v );
+    end procedure send_start;
+
+    procedure send_start_write(constant addr : std_logic_vector(6 downto 0)) is
+    begin
+      send_start( addr, restart => false, read => false );
+    end procedure send_start_write;
+
+    procedure send_restart_write(constant addr : std_logic_vector(6 downto 0)) is
+    begin
+      send_start( addr, restart => true , read => false );
+    end procedure send_restart_write;
+
+    procedure send_start_read (constant addr : std_logic_vector(6 downto 0)) is
+    begin
+      send_start( addr, restart => false, read => true  );
+    end procedure send_start_read;
+
+    procedure send_restart_read (constant addr : std_logic_vector(6 downto 0)) is
+    begin
+      send_start( addr, restart => true , read => true  );
+    end procedure send_restart_read ;
+
+
+    procedure send_stop is
+    begin
+      wrb( CR_REG  , CR_INI);
+      -- wait until bus is not busy anymore
+      while ( bsy = '1' ) loop
+        wait until rising_edge( clk );
+      end loop;
+    end procedure send_stop;
+
+    procedure read_data is
+    begin
+      rd( DATA_REG, strobe => true  );
+      pend;
+      rd( DATA_REG, strobe => false );
+    end procedure read_data;
+
+    procedure read_data_nak is
+    begin
+      wrb( CR_REG  , CR_INI or CR_MSTA or CR_TXAK );
+      read_data;
+    end procedure read_data_nak;
+
   begin
     while ( rst = '1' ) loop
       wait until rising_edge( clk );
@@ -168,52 +243,27 @@ begin
 
     wrb( FDR_REG , x"3F" ); -- 64
     wrb( CR_REG  , CR_INI);
-    wrb( CR_REG  , CR_INI or CR_MSTA or CR_MTX );
-    wrb( DATA_REG, x"a0" );
-    pend;
-    wrb( DATA_REG, x"00" );
-    pend;
-    wrb( DATA_REG, x"5A" );
-    pend;
-    wrb( DATA_REG, x"5B" );
-    pend;
-    wrb( DATA_REG, x"5C" );
-    pend;
+    send_start_write( I2C_ADDR_C );
+    send_data( x"00" ); -- RAM addr
+    send_data( x"5A" );
+    send_data( x"5B" );
+    send_data( x"5C" );
+
     -- restart
-    wrb( CR_REG  , CR_INI or CR_MSTA or CR_MTX or CR_RSTA );
-    wrb( DATA_REG, x"a0" );
-    pend;
-    -- set RAM address
-    wrb( DATA_REG, x"00" );
-    pend;
+    send_restart_write( I2C_ADDR_C );
+    send_data( x"00" ); -- RAM addr
     -- restart; change direction
-    wrb( CR_REG  , CR_INI or CR_MSTA or CR_RSTA );
-    wrb( DATA_REG, x"a0" );
-    pend;
+    send_restart_read( I2C_ADDR_C );
+
     -- starts first read
-    rd( DATA_REG );
-    pend;
-    -- returns first byte; starts second read
-    rd( DATA_REG );
+    read_data;
     report hstr( datb_r );
-    pend;
-    -- NAK
-    wrb( CR_REG  , CR_INI or CR_MSTA or CR_TXAK );
-    -- returns second byte; starts second read
-    rd( DATA_REG );
+    read_data;
     report hstr( datb_r );
-    pend;
-    -- returns third byte; not sure what is sent...
-    rd( DATA_REG );
+    read_data_nak;
     report hstr( datb_r );
-    pend;
-    -- send stop
-    wrb( CR_REG  , CR_INI);
-    -- wait until bus is not busy anymore
-    rd( ST_REG );
-    while ( datb_r(ST_MBB_I) = '1' ) loop
-      rd( ST_REG );
-    end loop;
+
+    send_stop;
 
     run <= false;
     wait until rising_edge( clk );
@@ -237,6 +287,7 @@ begin
       i2creg_DATR      => datr,
 
       i2cctl_IRQOK     => irq,
+      i2cctl_BUSY      => bsy,
 
       int_I2C_DIR      => SDAt,
       int_I2C_SDAO     => SDAo,
@@ -247,7 +298,7 @@ begin
 
   U_RAM : i2cRamSlave
     generic map (
-      I2C_ADDR_G       => 80,
+      I2C_ADDR_G       => to_integer(unsigned(I2C_ADDR_C)),
       ADDR_SIZE_G      => 1,
       DATA_SIZE_G      => 1
     )
