@@ -25,7 +25,8 @@ use work.ioxos_mpc_master_i2c_ctl_pkg.all;
 
 entity ioxos_mpc_master_i2c_ctl is
   generic (
-    enable_ila : in integer);
+    enable_ila    : in integer;
+    INITIAL_FDR_G : std_logic_vector(7 downto 0) := x"00");
   port (
     elb_RESET     : in  std_logic;
     elb_CLK       : in  std_logic;
@@ -105,7 +106,7 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
 
   -- initial registers values
   constant INITIAL_MPC_REG_I2CADR       : std_logic_vector(7 downto 0) := "00000000";
-  constant INITIAL_MPC_REG_I2CFDR       : std_logic_vector(7 downto 0) := "00000000";
+  constant INITIAL_MPC_REG_I2CFDR       : std_logic_vector(7 downto 0) := INITIAL_FDR_G;
   constant INITIAL_MPC_REG_I2CCR        : std_logic_vector(7 downto 0) := "00000000";
   constant INITIAL_MPC_REG_I2CSR        : std_logic_vector(7 downto 0) := "00000000";
   constant INITIAL_MPC_REG_I2CDR        : std_logic_vector(7 downto 0) := "00000000";
