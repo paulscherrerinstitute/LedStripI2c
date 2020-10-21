@@ -192,7 +192,8 @@ begin
         end if;
 
       when GSTP   =>
-        writeByte( v, CR_REG, CR_INI );
+        v.cr := CR_INI;
+        writeByte( v, CR_REG, v.cr );
         setState( v, WSTP );
 
       when WSTP   =>

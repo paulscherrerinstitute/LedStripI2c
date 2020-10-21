@@ -6,9 +6,11 @@ use     work.MpcI2cSequencerPkg.all;
 
 entity LedStripController is
   generic (
+    -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
     I2C_FDRVAL_G : std_logic_vector(7 downto 0);
     I2C_ADDR_R_G : std_logic_vector(6 downto 0) := "0000101";
-    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001"
+    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001";
+    GRAYENCODE_G : boolean                      := true
   );
   port (
     clk          : in  std_logic;
@@ -18,6 +20,7 @@ entity LedStripController is
     pulseid      : in  std_logic_vector(63 downto 0);
     pwm          : in  std_logic_vector( 7 downto 0) := x"ff"; -- pwm brightness control
     iref         : in  std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
+    busy         : out std_logic;
 
     sdaDir       : out std_logic;
     sdaOut       : out std_logic;
@@ -90,7 +93,7 @@ architecture rtl of LedStripController is
   constant PWM_INI_C          : Slv8 := x"FF";
   constant IREF_INI_C         : Slv8 := x"80";
 
-  type StateType is (IDLE, SHOW_PID, SET_BRIGHTNESS);
+  type StateType is (WAIT_READY, IDLE, START_SHOW_PID, START_SET_BRIGHTNESS);
 
   type RegType is record
     progPtr     :  PCType;
@@ -107,7 +110,7 @@ architecture rtl of LedStripController is
   constant REG_INIT_C : RegType := (
     progPtr     => SHOW_PID_ADDR_C,
     progValid   => '0',
-    state       => IDLE,
+    state       => WAIT_READY,
     briRight    => true,
     briI2c      => I2C_ADDR_R_G,
     pwm         => PWM_INI_C,
@@ -132,7 +135,7 @@ architecture rtl of LedStripController is
     for i in 0 to NUM_CTRL_C - 1 loop
       for j in 0 to CTL_NBYTES_C - 1 loop
         for k in 0 to 3 loop
-          prg( off + (CTL_OFF_C + CTL_NBYTES_C) * i + j )(2*k + 1) <= v( i * NUM_LEDS_C/NUM_CTRL_C + j*4 + i );
+          prg( off + CTL_OFF_C + (CTL_OFF_C + CTL_NBYTES_C) * i + j )(2*k + 1) <= v( i * NUM_LEDS_C/NUM_CTRL_C + j*4 + k );
         end loop;
       end loop;
     end loop;
@@ -151,7 +154,7 @@ architecture rtl of LedStripController is
       else
         rg.briI2c := I2C_ADDR_R_G;
       end if;
-      rg.briI2c :=  not rg.briI2c;
+      rg.briRight :=  not rg.briRight;
     end if;
   end procedure nextBriMux;
 
@@ -182,7 +185,7 @@ begin
         programs <= PROGS_INIT_C;
       else
         if ( strobe = '1' and (r.state = IDLE) ) then
-          setPID(programs, SHOW_PID_ADDR_C, pulseid(PidType'range), gray => true);
+          setPID(programs, SHOW_PID_ADDR_C, pulseid(PidType'range), gray => GRAYENCODE_G);
           setSendByte(programs, SEND_BYTE_ADDR_C, r.briI2c, r.briAddr, r.briData);
         end if;
       end if;
@@ -194,21 +197,26 @@ begin
   begin
     v          := r;
     case ( r.state ) is
+      when WAIT_READY =>
+        if ( progReady = '1' ) then
+          v.state := IDLE;
+        end if;
+
       when IDLE =>
         if ( strobe = '1' ) then
-          v.state     := SHOW_PID;
+          v.state     := START_SHOW_PID;
           v.progValid := '1';
         end if;
 
-      when SHOW_PID =>
+      when START_SHOW_PID =>
         if ( (r.progValid and progReady) = '1' ) then
-          v.state   := SET_BRIGHTNESS;
+          v.state   := START_SET_BRIGHTNESS;
           v.progPtr := SEND_BYTE_ADDR_C;
         end if;
 
-      when SET_BRIGHTNESS =>
+      when START_SET_BRIGHTNESS =>
         if ( (r.progValid and progReady) = '1' ) then
-          v.state     := IDLE;
+          v.state     := WAIT_READY;
           v.progPtr   := SHOW_PID_ADDR_C;
           v.progValid := '0';
           nextBriMux( v );
@@ -249,6 +257,8 @@ begin
       sclOut        => sclOut,
       sclInp        => sclInp
     );
+
+  busy <= '1' when (r.state /= IDLE) else '0';
  
 end architecture rtl;
 
