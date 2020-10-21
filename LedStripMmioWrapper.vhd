@@ -59,9 +59,9 @@ begin
 
   rst    <= (not rstn) or locRst;
 
-  rdata <= pulseid(31 downto 0)                              when raddr(1 downto 0) = "00" else 
-           dbg & cr & pwm & iref                             when raddr(1 downto 0) = "01" else
-           std_logic_vector(div_init + 1)                    when raddr(1 downto 0) = "10" else
+  rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
+           dbg & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
+           std_logic_vector(div_init + 1)                    when raddr(3 downto 2) = "10" else
            x"dead_beef";
 
   P_SEQ  : process( clk ) is
@@ -80,11 +80,11 @@ begin
           div <= div - 1;
         end if;
         if ( ws = '1' ) then
-          if ( waddr(1 downto 0) = "00" ) then
+          if ( waddr(3 downto 2) = "00" ) then
             if ( wstrb = x"f" ) then
               pulseid <= x"0000_0000" & wdata;
             end if;
-          elsif ( waddr(1 downto 0) = "01" ) then
+          elsif ( waddr(3 downto 2) = "01" ) then
             if ( wstrb(0) = '1' ) then
               iref <= wdata(7 downto 0);
             end if;
@@ -94,7 +94,7 @@ begin
             if ( wstrb(2) = '1' ) then
               cr   <= wdata(23 downto 16);
             end if;
-          elsif ( waddr(1 downto 0) = "10" ) then
+          elsif ( waddr(3 downto 2) = "10" ) then
             if ( wstrb = x"f" ) then
               div_init <= unsigned(wdata) - 1;
             end if;
