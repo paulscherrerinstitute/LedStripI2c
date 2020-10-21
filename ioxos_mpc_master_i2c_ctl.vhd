@@ -55,7 +55,9 @@ entity ioxos_mpc_master_i2c_ctl is
     int_I2C_SDAO  : out std_logic;
     int_I2C_SDC   : out std_logic;
     int_I2C_SDCI  : in  std_logic;
-    int_I2C_SDAI  : in  std_logic);
+    int_I2C_SDAI  : in  std_logic;
+
+    dbg_STATE     : out std_logic_vector(8 downto 0));
 end entity ioxos_mpc_master_i2c_ctl;
 
 
@@ -1386,4 +1388,7 @@ begin
   int_I2C_SDAO <= current_bit_sender_sda;
   int_I2C_SDC  <= current_bit_sender_scl;
 
+  dbg_STATE( 3 downto 0 ) <= std_logic_vector(to_unsigned(controller_states_type'pos(current_controller_state), 4));
+  dbg_STATE( 5 downto 4) <= std_logic_vector(to_unsigned(bit_receiver_states_type'pos(current_bit_receiver_state), 2));
+  dbg_STATE( 8 downto 6) <= std_logic_vector(to_unsigned(bit_sender_states_type'pos(current_bit_sender_state), 2));
 end architecture rtl;

@@ -51,7 +51,7 @@ architecture rtl of LedStripMmioWrapper is
   signal div          : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
   signal div_init     : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
 
-  signal dbg          : std_logic_vector( 7 downto 0);
+  signal dbg          : std_logic_vector(31 downto 0);
   signal locRst       : std_logic;
 begin
 
@@ -60,9 +60,9 @@ begin
   rst    <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
-           dbg & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
+           x"00" & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
            std_logic_vector(div_init + 1)                    when raddr(3 downto 2) = "10" else
-           x"dead_beef";
+           dbg;
 
   P_SEQ  : process( clk ) is
   begin
@@ -125,10 +125,10 @@ begin
       sclInp           => scl_i,
       sdaInp           => sda_i,
 
-      dbgState         => dbg(6 downto 0)
+      dbgState         => dbg(19 downto 0)
     );
 
-    dbg(7) <= '0';
+    dbg(31 downto 10) <= (others => '0');
 
  
 end architecture rtl;

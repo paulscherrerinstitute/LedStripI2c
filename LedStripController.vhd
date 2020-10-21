@@ -28,7 +28,7 @@ entity LedStripController is
     sclOut       : out std_logic;
     sclInp       : in  std_logic;
 
-    dbgState     : out std_logic_vector(6 downto 0)
+    dbgState     : out std_logic_vector(19 downto 0)
   );
 end entity LedStripController;
 
@@ -208,6 +208,8 @@ begin
         if ( strobe = '1' ) then
           v.state     := START_SHOW_PID;
           v.progValid := '1';
+          v.iref      := iref;
+          v.pwm       := pwm;
         end if;
 
       when START_SHOW_PID =>
@@ -259,12 +261,13 @@ begin
       sclOut        => sclOut,
       sclInp        => sclInp,
 
-      dbgState      => dbgState(3 downto 0)
+      dbgState      => dbgState(15 downto 0)
     );
 
-  dbgState(6 downto 4) <= std_logic_vector( to_unsigned( StateType'pos( r.state ), 3 ) );
+  dbgState(18 downto 16) <= std_logic_vector( to_unsigned( StateType'pos( r.state ), 3 ) );
+  dbgState(19)           <= '0';
 
-  busy <= '1' when (r.state /= IDLE) else '0';
+  busy                   <= '1' when (r.state /= IDLE) else '0';
  
 end architecture rtl;
 

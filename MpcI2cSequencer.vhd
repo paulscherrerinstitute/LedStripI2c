@@ -24,7 +24,7 @@ entity MpcI2cSequencer is
     sclOut        : out std_logic;
     sclInp        : in  std_logic;
 
-    dbgState      : out std_logic_vector(3 downto 0)
+    dbgState      : out std_logic_vector(15 downto 0)
   );
 end entity MpcI2cSequencer;
 
@@ -246,13 +246,19 @@ begin
       int_I2C_SDAO     => sdaOut,
       int_I2C_SDC      => sclOut,
       int_I2C_SDCI     => sclInp,
-      int_I2C_SDAI     => sdaInp
+      int_I2C_SDAI     => sdaInp,
+
+      dbg_STATE        => dbgState(8 downto 0)
     );
 
-  currentState <= getState(r);
+  dbgState(11)           <= sdaInp;
+  dbgState(10)           <= sclInp;
+  dbgState( 9)           <= '0';
+  dbgState(15 downto 12) <= std_logic_vector( to_unsigned( StateType'pos(getState(r)), dbgState'length ) );
 
-  memPtrReady  <= '1' when currentState = IDLE else '0';
+  currentState           <= getState(r);
 
-  dbgState     <= std_logic_vector( to_unsigned( StateType'pos(getState(r)), dbgState'length ) );
+  memPtrReady            <= '1' when currentState = IDLE else '0';
+
 
 end architecture rtl;
