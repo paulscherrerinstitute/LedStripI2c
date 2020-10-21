@@ -26,7 +26,9 @@ entity LedStripController is
     sdaOut       : out std_logic;
     sdaInp       : in  std_logic;
     sclOut       : out std_logic;
-    sclInp       : in  std_logic
+    sclInp       : in  std_logic;
+
+    dbgState     : out std_logic_vector(6 downto 0)
   );
 end entity LedStripController;
 
@@ -255,8 +257,12 @@ begin
       sdaOut        => sdaOut,
       sdaInp        => sdaInp,
       sclOut        => sclOut,
-      sclInp        => sclInp
+      sclInp        => sclInp,
+
+      dbgState      => dbgState(3 downto 0)
     );
+
+  dbgState(6 downto 4) <= std_logic_vector( to_unsigned( StateType'pos( r.state ), 3 ) );
 
   busy <= '1' when (r.state /= IDLE) else '0';
  

@@ -46,21 +46,28 @@ architecture rtl of LedStripMmioWrapper is
   signal rst          : std_logic;
   signal bsy          : std_logic;
 
+  signal cr           : std_logic_vector( 7 downto 0) := (others => '0');
+
   signal div          : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
   signal div_init     : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
+
+  signal dbg          : std_logic_vector( 7 downto 0);
+  signal locRst       : std_logic;
 begin
 
-  rst   <= not rstn;
+  locRst <= cr(0);
+
+  rst    <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr(1 downto 0) = "00" else 
-           x"0000" & pwm & iref                              when raddr(1 downto 0) = "01" else
+           dbg & cr & pwm & iref                             when raddr(1 downto 0) = "01" else
            std_logic_vector(div_init + 1)                    when raddr(1 downto 0) = "10" else
            x"dead_beef";
 
   P_SEQ  : process( clk ) is
   begin
     if ( rising_edge( clk ) ) then
-      if ( rst = '1' ) then
+      if ( rstn = '0' ) then
         div    <= div_init;
         strobe <= '0';
       else
@@ -83,6 +90,9 @@ begin
             end if;
             if ( wstrb(1) = '1' ) then
               pwm  <= wdata(15 downto 8);
+            end if;
+            if ( wstrb(2) = '1' ) then
+              cr   <= wdata(23 downto 16);
             end if;
           elsif ( waddr(1 downto 0) = "10" ) then
             if ( wstrb = x"f" ) then
@@ -113,8 +123,12 @@ begin
       sdaOut           => sda_t,
       sclOut           => scl_t,
       sclInp           => scl_i,
-      sdaInp           => sda_i
+      sdaInp           => sda_i,
+
+      dbgState         => dbg(6 downto 0)
     );
+
+    dbg(7) <= '0';
 
  
 end architecture rtl;
