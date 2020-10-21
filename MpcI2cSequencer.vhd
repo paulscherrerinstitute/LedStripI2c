@@ -254,7 +254,7 @@ begin
   dbgState(11)           <= sdaInp;
   dbgState(10)           <= sclInp;
   dbgState( 9)           <= '0';
-  dbgState(15 downto 12) <= std_logic_vector( to_unsigned( StateType'pos(getState(r)), dbgState'length ) );
+  dbgState(15 downto 12) <= std_logic_vector( to_unsigned( StateType'pos(getState(r)), 4 ) );
 
   currentState           <= getState(r);
 
