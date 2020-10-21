@@ -18,7 +18,7 @@ entity LedStripMmioWrapper is
     raddr        : in  std_logic_vector(ADDR_W_G - 1 downto 0);
     rdata        : out std_logic_vector(31 downto 0);
     rerr         : out std_logic := '0';
-    rvalid       : out std_logic := '0';
+    rvalid       : out std_logic := '1';
 
     ws           : in  std_logic; 
     waddr        : in  std_logic_vector(ADDR_W_G - 1 downto 0);
@@ -46,39 +46,47 @@ architecture rtl of LedStripMmioWrapper is
   signal rst          : std_logic;
   signal bsy          : std_logic;
 
-  signal div          : natural range 0 to DIV_G - 1 := DIV_G - 1;
+  signal div          : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
+  signal div_init     : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
 begin
 
   rst   <= not rstn;
 
-  rdata <= pulseid(31 downto 0) when raddr(0) = '0' else x"0000" & pwm & iref;
+  rdata <= pulseid(31 downto 0)                              when raddr(1 downto 0) = "00" else 
+           x"0000" & pwm & iref                              when raddr(1 downto 0) = "01" else
+           std_logic_vector(div_init + 1)                    when raddr(1 downto 0) = "10" else
+           x"dead_beef";
 
   P_SEQ  : process( clk ) is
   begin
     if ( rising_edge( clk ) ) then
       if ( rst = '1' ) then
-        div    <= DIV_G - 1;
+        div    <= div_init;
         strobe <= '0';
       else
         strobe <= '0';
         if ( div = 0 ) then
-          div     <= DIV_G - 1;
+          div     <= div_init;
           strobe  <= '1';
           pulseid <= std_logic_vector(unsigned(pulseid) + 1);
         else
           div <= div - 1;
         end if;
         if ( ws = '1' ) then
-          if ( waddr(0) = '0' ) then
+          if ( waddr(1 downto 0) = "00" ) then
             if ( wstrb = x"f" ) then
               pulseid <= x"0000_0000" & wdata;
             end if;
-          else
+          elsif ( waddr(1 downto 0) = "01" ) then
             if ( wstrb(0) = '1' ) then
               iref <= wdata(7 downto 0);
             end if;
             if ( wstrb(1) = '1' ) then
               pwm  <= wdata(15 downto 8);
+            end if;
+          elsif ( waddr(1 downto 0) = "10" ) then
+            if ( wstrb = x"f" ) then
+              div_init <= unsigned(wdata) - 1;
             end if;
           end if;
         end if;
