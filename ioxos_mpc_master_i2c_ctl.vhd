@@ -22,11 +22,11 @@ use ieee.numeric_std.all;
 
 use work.ioxos_mpc_master_i2c_ctl_pkg.all;
 
-
 entity ioxos_mpc_master_i2c_ctl is
   generic (
     enable_ila    : in integer;
-    INITIAL_FDR_G : std_logic_vector(7 downto 0) := x"00");
+    INITIAL_FDR_G : std_logic_vector(7 downto 0) := x"00";
+    FIXED_FDR_G   : boolean := false);
   port (
     elb_RESET     : in  std_logic;
     elb_CLK       : in  std_logic;
@@ -114,7 +114,7 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
 
   -- write access
   signal mpc_reg_i2cadr_w               : std_logic_vector(7 downto 0);
-  signal mpc_reg_i2cfdr_w               : std_logic_vector(7 downto 0);
+  signal mpc_reg_i2cfdr_w               : std_logic_vector(7 downto 0) := INITIAL_MPC_REG_I2CFDR;
   signal mpc_reg_i2ccr_w                : std_logic_vector(7 downto 0);
   signal mpc_reg_i2cesr_w               : std_logic_vector(23 downto 0);
   signal mpc_reg_i2csr_w                : std_logic_vector(7 downto 0);
@@ -136,7 +136,7 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
   -- frequency divider register
   -----------------------------------------------------------------------------
 
-  alias  i2c_fdr                        : std_logic_vector(7 downto 2) is mpc_reg_i2cfdr_w(5 downto 0);
+  alias  i2c_fdr                        : std_logic_vector(7 downto 0) is mpc_reg_i2cfdr_w(7 downto 0);
 
   -----------------------------------------------------------------------------
   -- control register
@@ -236,9 +236,12 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
   -- NOTE: values taken from Freescale reference manual, see table on page 818
   -- in [1]
   --
+  -- NOTE: TS: feature addition: if bit 7 is set in the register then 6:0 are
+  --           taken as a literal value (the table does not supply small dividers).
+
   type fdr_reg_to_value_rom_type is array (0 to 63) of unsigned(16 downto 0);
 
-  signal fdr_reg_to_value               : fdr_reg_to_value_rom_type := (
+  constant fdr_value_rom                : fdr_reg_to_value_rom_type := (
     to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x00 - 2, 17),
     to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x01 - 2, 17),
     to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x02 - 2, 17),
@@ -304,6 +307,18 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
     to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3E - 2, 17),
     to_unsigned(IOXOS_MPC_MASTER_I2C_CTL_FDR_0x3F - 2, 17));
 
+  function fdr_reg_to_value (regval : unsigned(7 downto 0)) return unsigned is
+    variable v : unsigned(16 downto 0);
+  begin
+    if ( regval(7) = '1' ) then
+      v := resize( regval(6 downto 0), v'length );
+      v := v - 2; -- handles regval(6:0) = 0 as well;
+      return  v;
+    else
+      return fdr_value_rom( to_integer( regval(5 downto 0) ) );
+    end if;
+  end function fdr_reg_to_value;
+  
   -- prescaler down counter and tick signal
   signal current_prescaler_value        : unsigned(16 downto 0) := (others => '0');
   signal next_prescaler_value           : unsigned(16 downto 0);
@@ -525,7 +540,9 @@ begin
     if (rising_edge(elb_CLK)) then
       if (elb_RESET = '1') then
         mpc_reg_i2cadr_w   <= INITIAL_MPC_REG_I2CADR;
+        if ( not FIXED_FDR_G ) then
         mpc_reg_i2cfdr_w   <= INITIAL_MPC_REG_I2CFDR;
+        end if;
         mpc_reg_i2ccr_w    <= INITIAL_MPC_REG_I2CCR;
         mpc_reg_i2csr_w    <= INITIAL_MPC_REG_I2CSR;
         mpc_reg_i2cdr_w    <= INITIAL_MPC_REG_I2CDR;
@@ -535,7 +552,7 @@ begin
         if (i2creg_WRSTRB = '1') then
           if (i2creg_WE0(0) = '1') then
             mpc_reg_i2cadr_w <= i2creg_DATW;
-          elsif (i2creg_WE0(1) = '1') then
+          elsif ( not FIXED_FDR_G and (i2creg_WE0(1) = '1') ) then
             mpc_reg_i2cfdr_w <= i2creg_DATW;
           elsif (i2creg_WE0(2) = '1') then
             mpc_reg_i2cdfsrr_w <= i2creg_DATW;
@@ -720,7 +737,7 @@ begin
   end process prescaler_COMBO_PROC;
 
 
-  prescaler_init_value <= fdr_reg_to_value(to_integer(unsigned(i2c_fdr)));
+  prescaler_init_value <= fdr_reg_to_value(unsigned(i2c_fdr));
 
   -----------------------------------------------------------------------------
   -- controller
