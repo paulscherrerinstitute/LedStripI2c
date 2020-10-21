@@ -128,8 +128,7 @@ begin
       dbgState         => dbg(19 downto 0)
     );
 
-    dbg(31 downto 10) <= (others => '0');
-
+    dbg(31 downto 20) <= (others => '0');
  
 end architecture rtl;
 
