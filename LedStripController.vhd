@@ -54,6 +54,8 @@ architecture rtl of LedStripController is
 
   subtype  I2cAddrType    is std_logic_vector(6 downto 0);
 
+  constant SL_ONE_C        : std_logic := '1';
+
   -- addresses in the pca9955B
   -- bit 7 lets address auto-increment
   constant LED_MODE_ADDR_C : U8 := x"82";
@@ -259,7 +261,7 @@ begin
       SYNC_STAGES_G => DBNCE_SYNC_G,
       LOHI_STABLE_G => DBNCE_CYCL_G,
       HILO_STABLE_G => DBNCE_CYCL_G,
-      RESET_STATE_G => '1'
+      RESET_STATE_G => SL_ONE_C
     )
     port map (
       clk           => clk,
@@ -273,7 +275,7 @@ begin
       SYNC_STAGES_G => DBNCE_SYNC_G,
       LOHI_STABLE_G => DBNCE_CYCL_G,
       HILO_STABLE_G => DBNCE_CYCL_G,
-      RESET_STATE_G => '1'
+      RESET_STATE_G => SL_ONE_C
     )
     port map (
       clk           => clk,
