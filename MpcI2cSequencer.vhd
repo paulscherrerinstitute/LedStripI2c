@@ -18,6 +18,8 @@ entity MpcI2cSequencer is
     memPtrValid   : in  std_logic;
     memPtrReady   : out std_logic;
 
+    malErrors     : out std_logic_vector(31 downto 0);
+
     sdaDir        : out std_logic;
     sdaOut        : out std_logic;
     sdaInp        : in  std_logic;
@@ -59,6 +61,8 @@ architecture rtl of MpcI2cSequencer is
     ctlWE      : WEArray;
     ctlWStrb   : std_logic;
     ctlWData   : std_logic_vector(7 downto 0);
+    mal        : std_logic;
+    malErrors  : unsigned(31 downto 0);
   end record RegType;
 
   constant REG_INIT_C : RegType := (
@@ -68,7 +72,9 @@ architecture rtl of MpcI2cSequencer is
     stateSP    =>  0,
     ctlWE      => (others => (others => '0')),
     ctlWStrb   => '0',
-    ctlWData   => (others => '0')
+    ctlWData   => (others => '0'),
+    mal        => '0',
+    malErrors  => (others => '0')
   );
 
   signal r   : RegType := REG_INIT_C;
@@ -76,6 +82,7 @@ architecture rtl of MpcI2cSequencer is
 
   signal irq : std_logic;
   signal bsy : std_logic;
+  signal mal : std_logic;
 
   -- readout port
   signal memData : MpcI2cSequenceDataType := (others => '0');
@@ -135,7 +142,7 @@ begin
     end if;
   end process P_READ;
 
-  P_COMB : process( r, memPtr, memPtrValid, memData, irq, bsy ) is
+  P_COMB : process( r, memPtr, memPtrValid, memData, irq, bsy, mal ) is
     variable v     : RegType;
   begin
     v          := r;
@@ -183,7 +190,8 @@ begin
       when WIRQ   =>
         if ( irq = '1' ) then
           -- clear interrupt condition
-          writeByte( v, ST_REG, (x"FF" and not ST_MIF) );
+          v.mal := mal;
+          writeByte( v, ST_REG, (x"FF" and not (ST_MIF or ST_MAL)) );
           setState( v, WICL );
         end if;
 
@@ -191,6 +199,14 @@ begin
       when WICL  =>
         if ( irq = '0' ) then
           popState( v );
+          if ( r.mal = '1' ) then
+            -- arbitration was lost; must clear CR_MSTA before
+            -- the mpc controller can proceed; We skip to GSTP
+            -- which will do exactly that...
+            v.malErrors := r.malErrors + 1
+            v.mal       := '0';
+            setState( v, GSTP );
+          end if;
         end if;
 
       when GSTP   =>
@@ -241,6 +257,7 @@ begin
 
       i2cctl_IRQOK     => irq,
       i2cctl_BUSY      => bsy,
+      i2cctl_ERROR     => mal,
 
       int_I2C_DIR      => sdaDir,
       int_I2C_SDAO     => sdaOut,
@@ -259,6 +276,8 @@ begin
   currentState           <= getState(r);
 
   memPtrReady            <= '1' when currentState = IDLE else '0';
+
+  malErrors              <= std_logic_vector(r.malErrors);
 
 
 end architecture rtl;

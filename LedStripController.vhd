@@ -22,6 +22,8 @@ entity LedStripController is
     iref         : in  std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
     busy         : out std_logic;
 
+    malErrors    : out std_logic_vector(31 downto 0);
+
     sdaDir       : out std_logic;
     sdaOut       : out std_logic;
     sdaInp       : in  std_logic;
@@ -254,6 +256,8 @@ begin
       memPtr        => r.progPtr,
       memPtrValid   => r.progValid,
       memPtrReady   => progReady,
+
+      malErrors     => malErrors,
 
       sdaDir        => sdaDir,
       sdaOut        => sdaOut,

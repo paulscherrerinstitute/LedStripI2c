@@ -52,6 +52,7 @@ architecture rtl of LedStripMmioWrapper is
   signal div_init     : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
 
   signal dbg          : std_logic_vector(31 downto 0);
+  signal malErrors    : std_logic_vector(31 downto 0);
   signal locRst       : std_logic;
 begin
 
@@ -118,6 +119,7 @@ begin
       pwm              => pwm,
       iref             => iref,
       busy             => bsy,
+      malErrors        => malErrors,
 
       sdaDir           => open,
       sdaOut           => sda_t,
@@ -128,7 +130,8 @@ begin
       dbgState         => dbg(19 downto 0)
     );
 
-    dbg(31 downto 20) <= (others => '0');
+    dbg(31 downto 24) <= malErrors(7 downto 0);
+    dbg(23 downto 20) <= (others => '0');
  
 end architecture rtl;
 
