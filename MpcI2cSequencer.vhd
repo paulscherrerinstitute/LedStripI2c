@@ -114,6 +114,7 @@ architecture rtl of MpcI2cSequencer is
   constant DATA_REG      : natural := 8;
 
   constant ST_MIF        : std_logic_vector(7 downto 0) := x"02";
+  constant ST_MAL        : std_logic_vector(7 downto 0) := x"10";
 
   procedure writeByte(
     variable rg    : inout RegType;
