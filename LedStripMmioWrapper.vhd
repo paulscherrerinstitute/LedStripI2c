@@ -7,7 +7,7 @@ entity LedStripMmioWrapper is
     -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
     -- If MSBit is set then the lower 7 bits are a literal value, otherwise it is
     -- an index into the MPC-controller's table.
-    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := "1" & "1000000";
+    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := x"C0";
     DIV_G        : natural                      := 100000000/100;
     ADDR_W_G     : positive                     := 4
   );
