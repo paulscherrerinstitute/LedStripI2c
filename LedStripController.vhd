@@ -146,6 +146,7 @@ architecture rtl of LedStripController is
       v := (pid xor ('0' & pid(pid'left downto pid'right + 1) ));
     end if;
     -- each bit in the PID vector is represented by two bits in the control words: '0' => "00", '1' => "10"
+    -- (see PCA9955 datasheet)
     for i in 0 to NUM_CTRL_C - 1 loop
       for j in 0 to CTL_NBYTES_C - 1 loop
         for k in 0 to 3 loop
