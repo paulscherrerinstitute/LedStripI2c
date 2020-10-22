@@ -204,7 +204,7 @@ begin
             -- arbitration was lost; must clear CR_MSTA before
             -- the mpc controller can proceed; We skip to GSTP
             -- which will do exactly that...
-            v.malErrors := r.malErrors + 1
+            v.malErrors := r.malErrors + 1;
             v.mal       := '0';
             setState( v, GSTP );
           end if;
