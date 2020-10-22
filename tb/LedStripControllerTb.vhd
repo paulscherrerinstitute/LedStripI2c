@@ -10,11 +10,28 @@ end entity LedStripControllerTb;
 
 architecture sim of LedStripControllerTb is
 
+  -- max SCL rate is fclk/(4*SCL_DIVISOR_C)
+  -- NOTE: If too fast then the filter in I2cRegSlave will filter the clock!
+  constant  SCL_DIVISOR_C    : natural range 2 to 127 := 6;
+  -- sync stages lower the clock and add delay
+  constant  SYNC_STAGES_C    : natural := 1;
+  -- so does the debouncer; should be less than 2*SCL_DIVISOR 
+  constant  DEBOUNCE_C       : natural := 4;
+  -- slave filter; also adds...
+  constant  SLV_FILTER_C     : natural range 2 to 512 := 2;
+
+  -- how many test loop
+  constant NLOOPS_C          : natural := 256;
+
+  -- after how many loops we change FDR
+  constant  NLOOPS_SET_FDR_C : integer := 1; --NLOOPS_C;
+
   component i2cRegSlaveWrap is
     generic (
       I2C_ADDR_G  : integer range 0 to 1023;
       ADDR_SIZE_G : positive; -- in bytes
-      DATA_SIZE_G : positive  -- in bytes
+      DATA_SIZE_G : positive; -- in bytes
+      FILTER_G    : natural range 2 to 512
     );
     port (
       clk    : in    std_logic;
@@ -43,7 +60,6 @@ architecture sim of LedStripControllerTb is
   constant ADDR_SIZE_C : natural := 1;
   constant DATA_SIZE_C : natural := 1;
 
-  constant NLOOPS_C    : natural := 256;
 
   signal SDA, SCL : std_logic;
 
@@ -69,6 +85,12 @@ architecture sim of LedStripControllerTb is
   signal pwm      : std_logic_vector( 7 downto 0) := x"F0";
   signal iref     : std_logic_vector( 7 downto 0) := x"0A";
 
+  signal fdrValid : std_logic                     := '0';
+
+  signal malErrs  : std_logic_vector(31 downto 0);
+
+  -- if MSBit is set the lower 7 bits are a verbatim value
+  signal fdr      : std_logic_vector( 7 downto 0) := "1" & std_logic_vector(to_unsigned(SCL_DIVISOR_C, 7));
 
 begin
 
@@ -127,8 +149,15 @@ begin
   begin
 
     while ( nloops <= NLOOPS_C ) loop
+      if ( nloops >= NLOOPS_SET_FDR_C ) then
+         fdrValid <= '1';
+      end if;
       wait until rising_edge( clk );
     end loop;
+
+    if ( unsigned(malErrs) /= 0 ) then
+      report "Test FAILED: " & hstr(malErrs) & " arbitration errors (result of filtered signals)" severity failure;
+    end if;
 
     run <= false;
 
@@ -150,6 +179,10 @@ begin
       iref             => iref,
       busy             => bsy,
       grayCode         => '0',
+      malErrors        => malErrs,
+
+      fdrRegValid      => fdrValid,
+      fdrRegData       => fdr,
 
       sdaDir           => SDAt,
       sdaOut           => SDAo,
@@ -173,7 +206,8 @@ begin
     generic map (
       I2C_ADDR_G       => to_integer(unsigned(I2C_ADDR_C(device))),
       ADDR_SIZE_G      => ADDR_SIZE_C,
-      DATA_SIZE_G      => DATA_SIZE_C
+      DATA_SIZE_G      => DATA_SIZE_C,
+      FILTER_G         => SLV_FILTER_C
     )
     port map (
       clk              => clk,

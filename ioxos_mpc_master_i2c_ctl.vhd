@@ -312,7 +312,11 @@ architecture rtl of ioxos_mpc_master_i2c_ctl is
   begin
     if ( regval(7) = '1' ) then
       v := resize( regval(6 downto 0), v'length );
-      v := v - 2; -- handles regval(6:0) = 0 as well;
+      if ( v < 2 ) then -- enforce minimum
+        v := to_unsigned( 0, v'length );
+      else
+        v := v - 2;
+      end if;
       return  v;
     else
       return fdr_value_rom( to_integer( regval(5 downto 0) ) );

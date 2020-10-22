@@ -9,7 +9,12 @@ entity LedStripController is
     -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
     I2C_FDRVAL_G : std_logic_vector(7 downto 0);
     I2C_ADDR_R_G : std_logic_vector(6 downto 0) := "0000101";
-    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001"
+    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001";
+    -- Debouncer (synchronizers and debounce delays effectively slower the max. SCL rate!)
+    -- synchronization stages in the SDA/SCL input debouncer
+    DBNCE_SYNC_G : natural range 0 to 3         := 3;
+    -- for how many cycles to debounce the incoming SDA/SCL signals
+    DBNCE_CYCL_G : natural                      := 10
   );
   port (
     clk          : in  std_logic;
@@ -21,6 +26,9 @@ entity LedStripController is
     iref         : in  std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
     grayCode     : in  std_logic;
     busy         : out std_logic;
+
+    fdrRegValid  : in  std_logic                     := '0';
+    fdrRegData   : in  std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
 
     malErrors    : out std_logic_vector(31 downto 0);
 
@@ -175,10 +183,13 @@ architecture rtl of LedStripController is
     prg( off + BRI_VAL_OFF_C )(7 downto 0) <= wdata;
   end procedure setSendByte;
 
-  signal progReady : std_logic;
+  signal progReady      : std_logic;
 
-  signal r         : RegType := REG_INIT_C;
-  signal rin       : RegType;
+  signal r              : RegType := REG_INIT_C;
+  signal rin            : RegType;
+
+  signal sclInpFiltered : std_logic;
+  signal sdaInpFiltered : std_logic;
 
 begin
 
@@ -243,6 +254,34 @@ begin
     end if;
   end process P_SEQ;
 
+  U_DebounceSCL : entity work.InpDebouncer
+    generic map (
+      SYNC_STAGES_G => DBNCE_SYNC_G,
+      LOHI_STABLE_G => DBNCE_CYCL_G,
+      HILO_STABLE_G => DBNCE_CYCL_G,
+      RESET_STATE_G => '1'
+    )
+    port map (
+      clk           => clk,
+      rst           => rst,
+      dataIn        => sclInp,
+      dataOut       => sclInpFiltered
+    );
+
+  U_DebounceSDA : entity work.InpDebouncer
+    generic map (
+      SYNC_STAGES_G => DBNCE_SYNC_G,
+      LOHI_STABLE_G => DBNCE_CYCL_G,
+      HILO_STABLE_G => DBNCE_CYCL_G,
+      RESET_STATE_G => '1'
+    )
+    port map (
+      clk           => clk,
+      rst           => rst,
+      dataIn        => sdaInp,
+      dataOut       => sdaInpFiltered
+    );
+
   U_Controller : entity work.MpcI2cSequencer
     generic map (
       MEM_DEPTH_G   => PROGS_LENGTH_C,
@@ -257,13 +296,16 @@ begin
       memPtrValid   => r.progValid,
       memPtrReady   => progReady,
 
+      fdrRegValid   => fdrRegValid,
+      fdrRegData    => fdrRegData,
+
       malErrors     => malErrors,
 
       sdaDir        => sdaDir,
       sdaOut        => sdaOut,
-      sdaInp        => sdaInp,
+      sdaInp        => sdaInpFiltered,
       sclOut        => sclOut,
-      sclInp        => sclInp,
+      sclInp        => sclInpFiltered,
 
       dbgState      => dbgState(15 downto 0)
     );

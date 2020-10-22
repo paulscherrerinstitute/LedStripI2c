@@ -18,6 +18,9 @@ entity MpcI2cSequencer is
     memPtrValid   : in  std_logic;
     memPtrReady   : out std_logic;
 
+    fdrRegValid   : in  std_logic                     := '0';
+    fdrRegData    : in  std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
+
     malErrors     : out std_logic_vector(31 downto 0);
 
     sdaDir        : out std_logic;
@@ -55,6 +58,8 @@ architecture rtl of MpcI2cSequencer is
 
   type RegType is record
     cr         : std_logic_vector(7 downto 0);
+    fdr        : std_logic_vector(7 downto 0);
+    fdrDes     : std_logic_vector(7 downto 0);
     memPtr     : PtrType;
     state      : StateStackType;
     stateSP    : StackPtrType;
@@ -67,6 +72,8 @@ architecture rtl of MpcI2cSequencer is
 
   constant REG_INIT_C : RegType := (
     cr         => CR_INI,
+    fdr        => I2C_FDRVAL_G,
+    fdrDes     => I2C_FDRVAL_G,
     memPtr     =>  0,
     state      => (others => INIT),
     stateSP    =>  0,
@@ -109,6 +116,7 @@ architecture rtl of MpcI2cSequencer is
     rg.stateSP := rg.stateSP - 1;
   end procedure popState;
 
+  constant FDR_REG       : natural := 1;
   constant CR_REG        : natural := 3;
   constant ST_REG        : natural := 4;
   constant DATA_REG      : natural := 8;
@@ -143,11 +151,16 @@ begin
     end if;
   end process P_READ;
 
-  P_COMB : process( r, memPtr, memPtrValid, memData, irq, bsy, mal ) is
+  P_COMB : process( r, memPtr, memPtrValid, memData, irq, bsy, mal, fdrRegData, fdrRegValid ) is
     variable v     : RegType;
   begin
     v          := r;
     v.ctlWStrb := '0';
+
+    if ( fdrRegValid = '1' ) then
+      v.fdrDes := fdrRegData;
+    end if;
+
     case ( getState(r) ) is
 
       when INIT   =>
@@ -217,9 +230,12 @@ begin
 
       when WSTP   =>
         if ( bsy = '0' ) then
+          if ( r.fdrDes /= r.fdr ) then
+            v.fdr := r.fdrDes;
+            writeByte( v, FDR_REG, r.fdrDes );
+          end if;
           setState(v, IDLE);
         end if;
-
 
       when others => setState(v, INIT);
     end case;

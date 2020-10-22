@@ -5,8 +5,7 @@ use     ieee.numeric_std.all;
 entity LedStripMmioWrapper is
   generic (
     -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
-    I2C_FDRVAL_G : std_logic_vector(7 downto 0);
-    GRAYENCODE_G : boolean                      := true;
+    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := "1" & std_logic_vector(to_unsigned(80, 7));
     DIV_G        : natural                      := 100000000/100;
     ADDR_W_G     : positive                     := 4
   );
@@ -48,8 +47,10 @@ architecture rtl of LedStripMmioWrapper is
 
   signal cr           : std_logic_vector( 7 downto 0) := (others => '0');
 
-  signal div          : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
-  signal div_init     : unsigned(31 downto 0) := to_unsigned(DIV_G - 1, 32);
+  signal fdr          : std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
+
+  signal div          : unsigned(31 downto 0)         := to_unsigned(DIV_G - 1, 32);
+  signal div_init     : unsigned(31 downto 0)         := to_unsigned(DIV_G - 1, 32);
 
   signal dbg          : std_logic_vector(31 downto 0);
   signal malErrors    : std_logic_vector(31 downto 0);
@@ -61,7 +62,7 @@ begin
   rst    <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
-           x"00" & cr & pwm & iref                           when raddr(3 downto 2) = "01" else
+           fdr & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
            std_logic_vector(div_init + 1)                    when raddr(3 downto 2) = "10" else
            dbg;
 
@@ -69,8 +70,9 @@ begin
   begin
     if ( rising_edge( clk ) ) then
       if ( rstn = '0' ) then
-        div    <= div_init;
-        strobe <= '0';
+        div      <= div_init;
+        strobe   <= '0';
+        fdrValid <= '0';
       else
         strobe <= '0';
         if ( div = 0 ) then
@@ -95,6 +97,9 @@ begin
             if ( wstrb(2) = '1' ) then
               cr   <= wdata(23 downto 16);
             end if;
+            if ( wstrb(3) = '1' ) then
+              fdr  <= wdata(31 downto 24);
+            end if;
           elsif ( waddr(3 downto 2) = "10" ) then
             if ( wstrb = x"f" ) then
               div_init <= unsigned(wdata) - 1;
@@ -107,8 +112,7 @@ begin
 
   U_LED : entity work.LedStripController
     generic map (
-      I2C_FDRVAL_G     => "1" & std_logic_vector(to_unsigned(80, 7)),
-      GRAYENCODE_G     => false
+      I2C_FDRVAL_G     => I2C_FDRVAL_G
     )
     port map (
       rst              => rst,
@@ -121,6 +125,8 @@ begin
       busy             => bsy,
       grayCode         => cr(1),
       malErrors        => malErrors,
+      fdrRegValid      => '1',
+      fdrRegData       => fdr,
 
       sdaDir           => open,
       sdaOut           => sda_t,
