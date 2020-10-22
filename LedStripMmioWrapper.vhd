@@ -5,7 +5,9 @@ use     ieee.numeric_std.all;
 entity LedStripMmioWrapper is
   generic (
     -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
-    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := "1" & std_logic_vector(to_unsigned(80, 7));
+    -- If MSBit is set then the lower 7 bits are a literal value, otherwise it is
+    -- an index into the MPC-controller's table.
+    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := "1" & "1000000";
     DIV_G        : natural                      := 100000000/100;
     ADDR_W_G     : positive                     := 4
   );
