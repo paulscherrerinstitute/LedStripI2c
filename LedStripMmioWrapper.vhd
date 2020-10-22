@@ -74,7 +74,6 @@ begin
       if ( rstn = '0' ) then
         div      <= div_init;
         strobe   <= '0';
-        fdrValid <= '0';
       else
         strobe <= '0';
         if ( div = 0 ) then
