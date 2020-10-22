@@ -138,8 +138,7 @@ begin
 
   U_DUT : entity work.LedStripController
     generic map (
-      I2C_FDRVAL_G     => x"3F",
-      GRAYENCODE_G     => false
+      I2C_FDRVAL_G     => x"3F"
     )
     port map (
       rst              => rst,
@@ -150,6 +149,7 @@ begin
       pwm              => pwm,
       iref             => iref,
       busy             => bsy,
+      grayCode         => '0',
 
       sdaDir           => SDAt,
       sdaOut           => SDAo,

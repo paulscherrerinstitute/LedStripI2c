@@ -9,8 +9,7 @@ entity LedStripController is
     -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
     I2C_FDRVAL_G : std_logic_vector(7 downto 0);
     I2C_ADDR_R_G : std_logic_vector(6 downto 0) := "0000101";
-    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001";
-    GRAYENCODE_G : boolean                      := true
+    I2C_ADDR_L_G : std_logic_vector(6 downto 0) := "1101001"
   );
   port (
     clk          : in  std_logic;
@@ -20,6 +19,7 @@ entity LedStripController is
     pulseid      : in  std_logic_vector(63 downto 0);
     pwm          : in  std_logic_vector( 7 downto 0) := x"ff"; -- pwm brightness control
     iref         : in  std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
+    grayCode     : in  std_logic;
     busy         : out std_logic;
 
     malErrors    : out std_logic_vector(31 downto 0);
@@ -127,12 +127,12 @@ architecture rtl of LedStripController is
     signal   prg  : inout MpcI2cSequenceArray;
     constant off  : natural;
     constant pid  : PidType;
-    constant gray : boolean
+    constant gray : std_logic
   ) is
     variable v : PidType;
   begin
     v := pid;
-    if ( gray ) then
+    if ( gray = '1' ) then
       v := (pid xor ('0' & pid(pid'left downto pid'right + 1) ));
     end if;
     -- each bit in the PID vector is represented by two bits in the control words: '0' => "00", '1' => "10"
@@ -189,7 +189,7 @@ begin
         programs <= PROGS_INIT_C;
       else
         if ( strobe = '1' and (r.state = IDLE) ) then
-          setPID(programs, SHOW_PID_ADDR_C, pulseid(PidType'range), gray => GRAYENCODE_G);
+          setPID(programs, SHOW_PID_ADDR_C, pulseid(PidType'range), gray => grayCode);
           setSendByte(programs, SEND_BYTE_ADDR_C, r.briI2c, r.briAddr, r.briData);
         end if;
       end if;

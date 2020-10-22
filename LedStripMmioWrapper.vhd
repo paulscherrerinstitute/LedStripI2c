@@ -61,7 +61,7 @@ begin
   rst    <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
-           x"00" & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
+           x"00" & cr & pwm & iref                           when raddr(3 downto 2) = "01" else
            std_logic_vector(div_init + 1)                    when raddr(3 downto 2) = "10" else
            dbg;
 
@@ -119,6 +119,7 @@ begin
       pwm              => pwm,
       iref             => iref,
       busy             => bsy,
+      grayCode         => cr(1),
       malErrors        => malErrors,
 
       sdaDir           => open,
