@@ -47,6 +47,7 @@ architecture rtl of LedStripMmioWrapper is
   signal rst          : std_logic;
   signal bsy          : std_logic;
 
+  constant CR_INI_C   : std_logic_vector( 7 downto 0) := (others => '0');
   signal cr           : std_logic_vector( 7 downto 0) := (others => '0');
 
   signal fdr          : std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
@@ -57,11 +58,13 @@ architecture rtl of LedStripMmioWrapper is
   signal dbg          : std_logic_vector(31 downto 0);
   signal malErrors    : std_logic_vector(31 downto 0);
   signal locRst       : std_logic;
+
+  signal grayEnc      : std_logic;
 begin
 
-  locRst <= cr(0);
-
-  rst    <= (not rstn) or locRst;
+  locRst    <= cr(0);
+  grayEnc   <= not cr(1);
+  rst       <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
            fdr & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
@@ -124,7 +127,7 @@ begin
       pwm              => pwm,
       iref             => iref,
       busy             => bsy,
-      grayCode         => cr(1),
+      grayCode         => grayEnc,
       malErrors        => malErrors,
       fdrRegValid      => '1',
       fdrRegData       => fdr,
