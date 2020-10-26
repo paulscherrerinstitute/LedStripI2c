@@ -1,0 +1,4 @@
+V1.0:
+ - mini-USB footprint swapped; work-around: mount from bottom
+ - Fiber Tx/Rx modules swapped; RX should be to the right of TX
+   (when viewed from top)
