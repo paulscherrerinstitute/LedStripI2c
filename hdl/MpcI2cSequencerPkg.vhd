@@ -9,6 +9,7 @@ package MpcI2cSequencerPkg is
 
   constant MPCI2C_CTRL_C : natural := 8;
   constant MPCI2C_LAST_C : natural := 9;
+  constant MPCI2C_RDNW_C : natural := 0;
 
   -- prepend any of these to a data byte;
   -- If the bus is not currently held, the first item (even if SEQ_NORM) generates a start condition
