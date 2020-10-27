@@ -7,6 +7,10 @@ GHDL=ghdl
 GHDLFLAGS=
 GHDLRUNFLAGS= --wave=dump.ghw
 
+dflt:
+	@echo "Must specify a target: e.g., 'all', 'run' or 'test'"
+	@echo " -> 'test' "
+
 # Default target : elaborate
 all : elab
 
@@ -14,9 +18,25 @@ all : elab
 elab : force
 	$(GHDL) -c $(GHDLFLAGS) -e ledstripcontrollertb
 
+test.log: RUNOUT= > test.log
+test.log: GHDLRUNFLAGS=
+
+test.log: run
+
+test.inp: test.log
+	sed -n -e 's/^[^@]*@/@/p' $< > $@
+
+comp.inp: ledStripControllerTb.dataOK
+	sed -n -e 's/^[^@]*@/@/p' $< > $@
+
+.INTERMEDIATE: comp.inp test.inp
+
+test: test.inp comp.inp
+	@if ! diff $^; then echo "Test FAILED"; else echo "Test PASSED"; fi
+
 # Run target
 run : force
-	$(GHDL) -c $(GHDLFLAGS) -r ledstripcontrollertb $(GHDLRUNFLAGS)
+	$(GHDL) -c $(GHDLFLAGS) -r ledstripcontrollertb $(GHDLRUNFLAGS) $(RUNOUT)
 
 # Targets to analyze libraries
 init: force
@@ -44,4 +64,7 @@ init: force
 	$(GHDL) -a $(GHDLFLAGS) I2cRegSlave.vhd
 	$(GHDL) -a $(GHDLFLAGS) i2cRegSlaveWrap.vhd
 
-force:
+.PHONY: force clean
+
+clean:
+	$(RM) test.log work-*.cf
