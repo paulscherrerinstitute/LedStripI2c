@@ -53,7 +53,7 @@ entity LedStripTcsrWrapper is
     evrClk       : in  std_logic;
     evrStream    : in  EvrStreamType;
      -- allows for lower update rates
-    ledTrig      : in  std_logic := '1'
+    ledTrig      : in  std_logic_vector(15 downto 0) := x"0001"
   );
 end entity LedStripTcsrWrapper;
 
@@ -98,6 +98,7 @@ architecture rtl of LedStripTcsrWrapper is
     fdr   : std_logic_vector( 7 downto 0);
     pwm   : std_logic_vector( 7 downto 0);
     iref  : std_logic_vector( 7 downto 0);
+    trgMux: std_logic_vector( 3 downto 0);
     cr    : std_logic_vector( 3 downto 0);
   end record RegType;
 
@@ -106,6 +107,7 @@ architecture rtl of LedStripTcsrWrapper is
     fdr                      => FDRVAL_C,
     pwm                      => PWM_DFLT_C,
     iref                     => IREF_DFLT_C,
+    trgMux                   => (others => '0'),
     cr                       => CR_DFLT_C
   );
 
@@ -131,12 +133,14 @@ architecture rtl of LedStripTcsrWrapper is
   signal wordAddr            : unsigned(tcsrADD'range);
 
   signal ledCtrlRst          : std_logic;
+  signal ledTrigLoc          : std_logic;
 
 begin
 
   ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tcsrRST );
 
-  cr32Rbk    <= r.fdr & x"0" & r.cr & r.pwm & r.iref;
+  cr32Rbk    <= r.fdr & r.trgMux & r.cr & r.pwm & r.iref;
+  ledTrigLoc <= ledTrig( to_integer( unsigned( r.trgMux ) ) );
 
   -- If we OR some marker LEDs we must do so after gray-code conversion,
   -- i.e., we cannot use the built-in gray-encoder or LedStripController
@@ -171,16 +175,17 @@ begin
       elsif ( tcsrWR = '1' ) then
         if ( wordAddr = TCSR_CR_IDX_C ) then
           if ( tcsrWE(3) = '1' ) then
-            r.fdr  <= tcsrDATW(31 downto 24);
+            r.fdr    <= tcsrDATW(31 downto 24);
           end if;
           if ( tcsrWE(2) = '1' ) then
-            r.cr   <= tcsrDATW(19 downto 16);
+            r.trgMux <= tcsrDATW(23 downto 20);
+            r.cr     <= tcsrDATW(19 downto 16);
           end if;
           if ( tcsrWE(1) = '1' ) then
-            r.pwm  <= tcsrDATW(15 downto  8);
+            r.pwm    <= tcsrDATW(15 downto  8);
           end if;
           if ( tcsrWE(0) = '1' ) then
-            r.iref <= tcsrDATW( 7 downto  0);
+            r.iref   <= tcsrDATW( 7 downto  0);
           end if;
         elsif ( wordAddr = TCSR_MARK_IDX_C ) then
           for i in tcsrWE'range loop
@@ -240,7 +245,7 @@ begin
     port map (
          clk                => evrClk,
          rst                => '0',
-         trg                => ledTrig,
+         trg                => ledTrigLoc,
 
          streamData         => evrStream.data,
          streamAddr         => evrStream.addr,
