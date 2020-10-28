@@ -128,9 +128,6 @@ architecture rtl of LedStripTcsrWrapper is
   signal sdaDirLoc           : std_logic;
   signal sdaOutLoc           : std_logic;
 
-  signal grayCodeEn          : std_logic;
-  signal shiftEn             : std_logic;
-
   signal wordAddr            : unsigned(tcsrADD'range);
 
   signal ledCtrlRst          : std_logic;
@@ -138,19 +135,21 @@ architecture rtl of LedStripTcsrWrapper is
 begin
 
   ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tcsrRST );
-  grayCodeEn <= not r.cr( CR_BIN_ENC_I_C );
-  shiftEn    <=     r.cr( CR_SHFT_EN_I_C );
 
   cr32Rbk    <= r.fdr & x"0" & r.cr & r.pwm & r.iref;
 
+  -- If we OR some marker LEDs we must do so after gray-code conversion,
+  -- i.e., we cannot use the built-in gray-encoder or LedStripController
   P_MARK : process ( r, pulseid ) is
     variable v : std_logic_vector(pulseid'range);
   begin
+    v := pulseid;
+    if ( r.cr( CR_BIN_ENC_I_C ) = '0' ) then
+      v := v xor ( '0' & v(v'left downto v'right + 1) );
+    end if;
     if ( r.cr( CR_SHFT_EN_I_C ) = '1' ) then
-      v := pulseid(pulseid'left - 1 downto 0) & '0';
+      v := v(v'left - 1 downto 0) & '0';
       v(r.mark'range) := (v(r.mark'range) or r.mark);
-    else
-      v := pulseid;
     end if;
     pulseid_o <= v;
   end process P_MARK;
@@ -210,7 +209,7 @@ begin
       pulseid               => pulseid_o,
       pwm                   => r.pwm,
       iref                  => r.iref,
-      grayCode              => grayCodeEn,
+      grayCode              => '0',
       busy                  => dbg(20),
 
       fdrRegValid           => '1',
