@@ -6,9 +6,9 @@ use     work.MpcI2cSequencerPkg.all;
 
 entity LedStripMmioWrapper is
   generic (
-    BUS_FREQ_G   : real                         := 1.0E8;
-    PID_FREQ_G   : real range 0.1 to 200.0      := 100.0;
-    ADDR_W_G     : positive                     := 5
+    BUS_FREQ_G   : natural                            := 100000000;
+    UPDATE_MS_G  : natural range 1    to natural'high := 10;
+    ADDR_W_G     : positive                           := 5
   );
   port (
     clk          : in  std_logic;
@@ -37,10 +37,12 @@ entity LedStripMmioWrapper is
 end entity LedStripMmioWrapper;
 
 architecture rtl of LedStripMmioWrapper is
+  constant BUS_FREQ_C : real                          := real(BUS_FREQ_G); -- vivado packager doesn't support real
+  constant PID_FREQ_C : real                          := 1000.0/real(UPDATE_MS_G);
 
-  constant DIV_C      : natural                       := natural(BUS_FREQ_G/PID_FREQ_G) - 1;
+  constant DIV_C      : natural                       := natural(BUS_FREQ_C/PID_FREQ_C) - 1;
   constant SCL_FREQ_C : real                          := 4.0E5;
-  constant FDRVAL_C   : std_logic_vector( 7 downto 0) := getFDRVal(BUS_FREQ_G, SCL_FREQ_C);
+  constant FDRVAL_C   : std_logic_vector( 7 downto 0) := getFDRVal(BUS_FREQ_C, SCL_FREQ_C);
 
   signal strobe       : std_logic                     := '0';
   signal pulseid      : std_logic_vector(63 downto 0) := (others => '0');
