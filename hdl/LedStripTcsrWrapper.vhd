@@ -133,25 +133,12 @@ architecture rtl of LedStripTcsrWrapper is
   signal wordAddr            : unsigned(tcsrADD'range);
 
   signal ledCtrlRst          : std_logic;
-  signal ledTrigLoc          : std_logic;
-
-  signal trgMuxEvr           : unsigned(3 downto 0) := (others => '0');
 
 begin
 
   ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tcsrRST );
 
   cr32Rbk    <= r.fdr & r.trgMux & r.cr & r.pwm & r.iref;
-  ledTrigLoc <= ledTrig( to_integer( trgMuxEvr ) );
-
-  -- synchronize trgMux into EVR clock domain; don't care about
-  -- glitches as this happens rarely
-  P_SYNC : process ( evrClk ) is
-  begin
-    if ( rising_edge( evrClk ) ) then
-      trgMuxEvr <= unsigned( r.trgMux );
-    end if;
-  end process P_SYNC;
 
   -- If we OR some marker LEDs we must do so after gray-code conversion,
   -- i.e., we cannot use the built-in gray-encoder or LedStripController
@@ -246,27 +233,48 @@ begin
 
   dbg(31 downto 21) <= (others => '0');
 
-  U_GetPid   : entity work.PulseidExtractor
-    generic map (
-      PULSEID_OFFSET_G      => PULSEID_OFFSET_G,
-      PULSEID_BIGEND_G      => PULSEID_BIGEND_G,
-      PULSEID_LENGTH_G      => PULSEID_LENGTH_G,
-      USE_ASYNC_OUTP_G      => ASYNC_CLOCKS_G
-    )
-    port map (
-         clk                => evrClk,
-         rst                => '0',
-         trg                => ledTrigLoc,
+  -- create a block; helps naming constraints...
 
-         streamData         => evrStream.data,
-         streamAddr         => evrStream.addr,
-         streamValid        => evrStream.valid,
+  B_PulseIdExtractor : block is
+    signal ledTrigLoc          : std_logic;
+    signal trgMuxEvr           : unsigned(3 downto 0) := (others => '0');
+  begin
 
-         oclk               => tcsrCLK,
-         orst               => tcsrRST,
-         pulseid            => pulseid,
-         pulseidStrobe      => pulseidValid
-    );
+    -- synchronize trgMux into EVR clock domain; don't care about
+    -- glitches as this happens rarely
+    P_SYNC : process ( evrClk ) is
+    begin
+      if ( rising_edge( evrClk ) ) then
+        trgMuxEvr <= unsigned( r.trgMux );
+      end if;
+    end process P_SYNC;
+
+    ledTrigLoc <= ledTrig( to_integer( trgMuxEvr ) );
+
+
+    U_GetPid   : entity work.PulseidExtractor
+      generic map (
+        PULSEID_OFFSET_G      => PULSEID_OFFSET_G,
+        PULSEID_BIGEND_G      => PULSEID_BIGEND_G,
+        PULSEID_LENGTH_G      => PULSEID_LENGTH_G,
+        USE_ASYNC_OUTP_G      => ASYNC_CLOCKS_G
+      )
+      port map (
+           clk                => evrClk,
+           rst                => '0',
+           trg                => ledTrigLoc,
+
+           streamData         => evrStream.data,
+           streamAddr         => evrStream.addr,
+           streamValid        => evrStream.valid,
+
+           oclk               => tcsrCLK,
+           orst               => tcsrRST,
+           pulseid            => pulseid,
+           pulseidStrobe      => pulseidValid
+      );
+
+  end block B_PulseIdExtractor;
 
   sdaOut  <= '0' when (sdaDirLoc = '1' and sdaOutLoc = '0') else '1';
 
