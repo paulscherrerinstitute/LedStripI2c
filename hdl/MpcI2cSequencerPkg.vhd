@@ -1,6 +1,9 @@
 library ieee;
 
 use ieee.std_logic_1164.all;
+use ieee.numeric_std.all;
+
+use work.ioxos_mpc_master_i2c_ctl_pkg.all;
 
 package MpcI2cSequencerPkg is 
 
@@ -85,4 +88,36 @@ package MpcI2cSequencerPkg is
   --     end if;
   -- 
 
+  function getFDRVal(busFreq : real; sclFreq : real) return std_logic_vector;
+
 end package MpcI2cSequencerPkg;
+
+package body MpcI2cSequencerPkg is
+
+  function getFDRVal(busFreq : real; sclFreq : real) return std_logic_vector is
+    variable div     : natural;
+    variable desired : real;
+    variable cmp     : real;
+    variable diff    : real;
+    variable minDiff : real;
+    variable minIdx  : natural;
+    constant MULT_C  : positive := 4; -- extra internal division by mpc state machine
+  begin
+    desired := busFreq/sclFreq/real(MULT_C);
+    div     := natural(desired);
+    if ( div <= 127) then
+      return "1" & std_logic_vector( to_unsigned(div, 7) );
+    else
+      for i in IOXOS_MPC_MASTER_I2C_DIVIDER_TABLE'range loop
+        cmp  := busFreq/real(IOXOS_MPC_MASTER_I2C_DIVIDER_TABLE(i))/real(MULT_C);
+        diff := abs(cmp - desired);
+        if ( (i = IOXOS_MPC_MASTER_I2C_DIVIDER_TABLE'left) or (diff < minDiff) ) then
+          minDiff := diff;
+          minIdx  := i;
+        end if;
+      end loop;
+      return "0" & std_logic_vector( to_unsigned( minIdx, 7 ) );
+    end if;
+  end function getFDRVal;
+
+end package body MpcI2cSequencerPkg;
