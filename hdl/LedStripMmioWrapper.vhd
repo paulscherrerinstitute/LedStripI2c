@@ -3,12 +3,13 @@ use     ieee.std_logic_1164.all;
 use     ieee.numeric_std.all;
 
 use     work.MpcI2cSequencerPkg.all;
+use     work.LedStripTcsrWrapperPkg.all;
 
 entity LedStripMmioWrapper is
   generic (
     BUS_FREQ_G   : natural                            := 100000000;
     UPDATE_MS_G  : positive                           := 10;
-    ADDR_W_G     : positive                           := 5;
+    ADDR_W_G     : positive                           := 6;
     NUM_LEDS_G   : positive range 1 to 32             := 30
   );
   port (
@@ -42,102 +43,86 @@ architecture rtl of LedStripMmioWrapper is
   constant PID_FREQ_C : real                          := 1000.0/real(UPDATE_MS_G);
 
   constant DIV_C      : natural                       := natural(BUS_FREQ_C/PID_FREQ_C) - 1;
-  constant SCL_FREQ_C : real                          := 4.0E5;
-  constant FDRVAL_C   : std_logic_vector( 7 downto 0) := getFDRVal(BUS_FREQ_C, SCL_FREQ_C);
 
-  signal strobe       : std_logic                     := '0';
   signal pulseid      : std_logic_vector(63 downto 0) := (others => '0');
-  signal pulseid_o    : std_logic_vector(63 downto 0) := (others => '0');
-  signal pwm          : std_logic_vector( 7 downto 0) := x"ff"; -- pwm brightness control
-  signal iref         : std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
 
   signal rst          : std_logic;
-  signal bsy          : std_logic;
-
-  constant CR_INI_C   : std_logic_vector( 7 downto 0) := (others => '0');
-  signal cr           : std_logic_vector( 7 downto 0) := (others => '0');
-
-  signal fdr          : std_logic_vector( 7 downto 0) := FDRVAL_C;
 
   signal div          : unsigned(31 downto 0)         := to_unsigned(DIV_C, 32);
   signal div_init     : unsigned(31 downto 0)         := to_unsigned(DIV_C, 32);
 
-  signal dbg          : std_logic_vector(31 downto 0);
-  signal malErrors    : std_logic_vector(31 downto 0);
-  signal nakErrors    : std_logic_vector(31 downto 0);
-  signal rbkErrors    : std_logic_vector(31 downto 0);
-  signal locRst       : std_logic;
+  signal tcsrADD      : std_logic_vector(ADDR_W_G - 1 downto 0);
+  signal tcsrDATR     : std_logic_vector(31       downto 0);
+  signal tcsrWR       : std_logic;
+  signal tcsrRD       : std_logic;
 
-  signal grayEnc      : std_logic;
-  signal markerEn     : std_logic;
+  signal raddr_w      : unsigned(ADDR_W_G - 2 downto 2);
+  signal waddr_w      : unsigned(ADDR_W_G - 2 downto 2);
 
-  signal raddr_w      : unsigned(raddr'left downto 2);
-  signal waddr_w      : unsigned(waddr'left downto 2);
+  signal evrStream    : evrStreamType;
+
+  signal streamPtr    : unsigned( 2 downto 0 ) := (others => '0');
+
 begin
 
   raddr_w   <= unsigned(raddr(raddr_w'range));
   waddr_w   <= unsigned(waddr(waddr_w'range));
 
-  locRst    <= cr(0);
-  grayEnc   <= not cr(1);
-  markerEn  <= cr(2);
-  rst       <= (not rstn) or locRst;
+  tcsrRD    <= rs and not raddr(ADDR_W_G - 1);
+  tcsrWR    <= ws and not waddr(ADDR_W_G - 1);
 
-  rdata <= pulseid(31 downto 0)                              when raddr_w = 0 else
-           fdr & cr & pwm & iref                             when raddr_w = 1 else
-           std_logic_vector(div_init + 1)                    when raddr_w = 2 else
-           dbg                                               when raddr_w = 3 else
-           malErrors                                         when raddr_w = 4 else
-           nakErrors                                         when raddr_w = 5 else
-           rbkErrors                                         when raddr_w = 6 else
-           (others => '0');
+  rdata     <= tcsrDATR                   when raddr(ADDR_W_G - 1) = '0'  else
+               pulseid(31 downto 0)       when raddr_w             =  0   else
+               std_logic_vector(div_init) when raddr_w             =  1   else
+               (others => '0');
 
-  P_MARK : process ( markerEn, pulseid ) is
-    variable v : std_logic_vector(pulseid'range);
+  rst       <= (not rstn);
+  tcsrADD   <= waddr when ws = '1' else raddr;
+
+  evrStream.data <= pulseid(7*8 + 7 downto 7*8) when streamPtr = 7 else
+                    pulseid(6*8 + 7 downto 6*8) when streamPtr = 6 else
+                    pulseid(5*8 + 7 downto 5*8) when streamPtr = 5 else
+                    pulseid(4*8 + 7 downto 4*8) when streamPtr = 4 else
+                    pulseid(3*8 + 7 downto 3*8) when streamPtr = 3 else
+                    pulseid(2*8 + 7 downto 2*8) when streamPtr = 2 else
+                    pulseid(1*8 + 7 downto 1*8) when streamPtr = 1 else
+                    pulseid(0*8 + 7 downto 0*8);
+
+  P_STREAM_ADDR : process ( streamPtr ) is
+    variable v : std_logic_vector( evrStream.addr'range );
   begin
-    if ( markerEn = '1' ) then
-      v := pulseid(pulseid'left - 1 downto 0) & '1';
-      v( NUM_LEDS_G - 1 ) := '1';
-    else
-      v := pulseid;
-    end if;
-    pulseid_o <= v;
-  end process P_MARK;
+    v := (others => '0');
+    v( streamPtr'range ) := std_logic_vector(streamPtr);
+    evrStream.addr <= v;
+  end process P_STREAM_ADDR;
 
   P_SEQ  : process( clk ) is
   begin
     if ( rising_edge( clk ) ) then
       if ( rstn = '0' ) then
-        div      <= div_init;
-        strobe   <= '0';
+        div       <= div_init;
+        streamPtr <= (others => '0');
       else
-        strobe <= '0';
+        if ( evrStream.valid = '1' ) then
+          if ( streamPtr = pulseid'length/8 - 1 ) then
+            evrStream.valid <= '0';
+          end if;
+          streamPtr <= streamPtr + 1;
+        end if;
         if ( div = 0 ) then
-          div     <= div_init;
-          strobe  <= '1';
-          pulseid <= std_logic_vector(unsigned(pulseid) + 1);
+          div             <= div_init;
+          pulseid         <= std_logic_vector(unsigned(pulseid) + 1);
+          streamPtr       <= (others => '0');
+          evrStream.valid <= '1';
         else
           div <= div - 1;
         end if;
-        if ( ws = '1' ) then
+        if ( (ws = '1') and (waddr(waddr'left) = '1')  ) then
           if    ( waddr_w = 0 ) then
             if ( wstrb = x"f" ) then
               pulseid <= x"0000_0000" & wdata;
             end if;
           elsif ( waddr_w = 1 ) then
-            if ( wstrb(0) = '1' ) then
-              iref <= wdata(7 downto 0);
-            end if;
-            if ( wstrb(1) = '1' ) then
-              pwm  <= wdata(15 downto 8);
-            end if;
-            if ( wstrb(2) = '1' ) then
-              cr   <= wdata(23 downto 16);
-            end if;
-            if ( wstrb(3) = '1' ) then
-              fdr  <= wdata(31 downto 24);
-            end if;
-          elsif ( waddr_w = 2 ) then
             if ( wstrb = x"f" ) then
               div_init <= unsigned(wdata) - 1;
             end if;
@@ -147,39 +132,32 @@ begin
     end if;
   end process P_SEQ;
 
-  U_LED : entity work.LedStripController
+  U_LED : entity work.LedStripTcsrWrapper
     generic map (
-      I2C_FDRVAL_G     => FDRVAL_C
+      TCSR_CLOCK_FRQ_G => BUS_FREQ_C,
+      PULSEID_OFFSET_G => 0
     )
     port map (
-      rst              => rst,
-      clk              => clk,
+      tcsrCLK          => clk,
+      tcsrRST          => rst,
 
-      strobe           => strobe,
-      pulseid          => pulseid_o,
-      pwm              => pwm,
-      iref             => iref,
-      busy             => bsy,
-      grayCode         => grayEnc,
+      tcsrADD          => tcsrADD(4 downto 2),
+      tcsrDATW         => wdata,
+      tcsrWE           => wstrb,
+      tcsrDATR         => tcsrDATR,
+      tcsrWR           => tcsrWR,
+      tcsrRD           => tcsrRD,
+      tcsrACK          => open,
+      tcsrERR          => open,
 
-      malErrors        => malErrors,
-      nakErrors        => nakErrors,
-      rbkErrors        => rbkErrors,
-
-      fdrRegValid      => '1',
-      fdrRegData       => fdr,
-
-      sdaDir           => open,
       sdaOut           => sda_t,
       sclOut           => scl_t,
       sclInp           => scl_i,
       sdaInp           => sda_i,
 
-      dbgState         => dbg(19 downto 0)
+      evrClk           => clk,
+      evrStream        => evrStream
     );
 
-    dbg(31 downto 24) <= malErrors(7 downto 0);
-    dbg(23 downto 20) <= (others => '0');
- 
 end architecture rtl;
 
