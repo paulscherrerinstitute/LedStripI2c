@@ -45,6 +45,7 @@ entity ioxos_mpc_master_i2c_ctl is
     -- Status & Debugging
     -----------------------------------------------------------------------------
     i2cctl_ERROR  : out std_logic := '0';
+    i2cctl_RXNAK  : out std_logic := '0';
     i2cctl_BUSY   : out std_logic := '0';
     i2cctl_IRQOK  : out std_logic := '0';
     i2cctl_IRQERR : out std_logic := '0';
@@ -533,6 +534,7 @@ begin
   -----------------------------------------------------------------------------
 
   i2cctl_ERROR  <= i2c_sr_mal_r;
+  i2cctl_RXNAK  <= i2c_sr_rxak_r;
   i2cctl_BUSY   <= current_controller_active;
 
   -----------------------------------------------------------------------------
