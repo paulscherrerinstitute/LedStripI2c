@@ -135,12 +135,23 @@ architecture rtl of LedStripTcsrWrapper is
   signal ledCtrlRst          : std_logic;
   signal ledTrigLoc          : std_logic;
 
+  signal trgMuxEvr           : unsigned(3 downto 0) := (others => '0');
+
 begin
 
   ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tcsrRST );
 
   cr32Rbk    <= r.fdr & r.trgMux & r.cr & r.pwm & r.iref;
-  ledTrigLoc <= ledTrig( to_integer( unsigned( r.trgMux ) ) );
+  ledTrigLoc <= ledTrig( to_integer( trgMuxEvr ) );
+
+  -- synchronize trgMux into EVR clock domain; don't care about
+  -- glitches as this happens rarely
+  P_SYNC : process ( evrClk ) is
+  begin
+    if ( rising_edge( evrClk ) ) then
+      trgMuxEvr <= unsigned( r.trgMux );
+    end if;
+  end process P_SYNC;
 
   -- If we OR some marker LEDs we must do so after gray-code conversion,
   -- i.e., we cannot use the built-in gray-encoder or LedStripController
