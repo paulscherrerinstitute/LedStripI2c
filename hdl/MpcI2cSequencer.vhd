@@ -224,6 +224,7 @@ begin
 
       when RCMD   =>
         v.sendAddr  := true;
+        v.rcvCnt    := (others => '0');
         popState(v);
 
       when SNDW   =>
@@ -283,10 +284,15 @@ begin
         v.readData  := i2cDATR(7 downto 0);
         v.readValid := '1';
         if ( r.rcvCnt = unsigned(memData(7 downto 0)) ) then
-          if ( (memData(MPCI2C_LAST_C) = '1') and (memData(MPCI2C_CTRL_C) = '1') ) then
-            setState(v, GSTP);
+          if ( memData(MPCI2C_LAST_C) = '1' ) then
+            if ( memData(MPCI2C_CTRL_C) = '1' ) then
+              setState(v, GSTP);
+            else
+              setState(v, IDLE);
+            end if;
           else
-            setState(v, IDLE);
+            v.memPtr := r.memPtr + 1;
+            pushState(v, SNDW, RCMD);
           end if;
         else
           v.rcvCnt := r.rcvCnt + 1;

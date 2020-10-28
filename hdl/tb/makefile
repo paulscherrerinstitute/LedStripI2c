@@ -24,10 +24,10 @@ test.log: GHDLRUNFLAGS=
 test.log: run
 
 test.inp: test.log
-	sed -n -e 's/^[^@]*@/@/p' $< > $@
+	sed -n -e 's/^.*@//p' $< > $@
 
 comp.inp: ledStripControllerTb.dataOK
-	sed -n -e 's/^[^@]*@/@/p' $< > $@
+	sed -n -e 's/^.*@//p' $< > $@
 
 .INTERMEDIATE: comp.inp test.inp
 
