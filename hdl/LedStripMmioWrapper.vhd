@@ -7,7 +7,7 @@ use     work.MpcI2cSequencerPkg.all;
 entity LedStripMmioWrapper is
   generic (
     BUS_FREQ_G   : natural                            := 100000000;
-    UPDATE_MS_G  : natural range 1    to natural'high := 10;
+    UPDATE_MS_G  : positive                           := 10;
     ADDR_W_G     : positive                           := 5
   );
   port (
