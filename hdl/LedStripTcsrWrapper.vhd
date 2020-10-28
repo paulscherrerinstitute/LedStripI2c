@@ -10,6 +10,8 @@ entity LedStripTcsrWrapper is
   generic (
     -- tcsrl clock frequence [Hz]
     TCSR_CLOCK_FRQ_G      : real;
+    -- default SCL frequency [Hz]; may change at run-time
+    DFLT_I2C_SCL_FRQ_G    : real                         := 400.0E3;
     -- offset in evr stream
     PULSEID_OFFSET_G      : natural                      := 52;
     -- length in octets
@@ -59,10 +61,7 @@ end entity LedStripTcsrWrapper;
 
 architecture rtl of LedStripTcsrWrapper is
 
-  -- default SCL frequency; may change at run-time
-  constant SCL_FRQ_C         : real := 400.0E3;
-
-  constant FDRVAL_C          : std_logic_vector(7 downto 0) := getFDRVal(TCSR_CLOCK_FRQ_G, SCL_FRQ_C); 
+  constant FDRVAL_C          : std_logic_vector(7 downto 0) := getFDRVal(TCSR_CLOCK_FRQ_G, DFLT_I2C_SCL_FRQ_G);
   signal pulseid             : std_logic_vector(63 downto 0);
   signal pulseidValid        : std_logic;
   signal pulseid_o           : std_logic_vector(63 downto 0);
