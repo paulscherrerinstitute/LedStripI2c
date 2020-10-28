@@ -2,14 +2,13 @@ library ieee;
 use     ieee.std_logic_1164.all;
 use     ieee.numeric_std.all;
 
+use     work.MpcI2cSequencerPkg.all;
+
 entity LedStripMmioWrapper is
   generic (
-    -- SCL freq. is frequency of 'clk' divided by 4*FDR_RATIO (selected by FDRVAL)
-    -- If MSBit is set then the lower 7 bits are a literal value, otherwise it is
-    -- an index into the MPC-controller's table.
-    I2C_FDRVAL_G : std_logic_vector(7 downto 0) := x"C0";
-    DIV_G        : natural                      := 100000000/100;
-    ADDR_W_G     : positive                     := 4
+    BUS_FREQ_G   : real                         := 1.0E8;
+    PID_FREQ_G   : real range 0.1 to 200.0      := 100.0;
+    ADDR_W_G     : positive                     := 5
   );
   port (
     clk          : in  std_logic;
@@ -39,6 +38,10 @@ end entity LedStripMmioWrapper;
 
 architecture rtl of LedStripMmioWrapper is
 
+  constant DIV_C      : natural                       := natural(BUS_FREQ_G/PID_FREQ_G) - 1;
+  constant SCL_FREQ_C : real                          := 4.0E5;
+  constant FDRVAL_C   : std_logic_vector( 7 downto 0) := getFDRVal(BUS_FREQ_G, SCL_FREQ_C);
+
   signal strobe       : std_logic                     := '0';
   signal pulseid      : std_logic_vector(63 downto 0) := (others => '0');
   signal pwm          : std_logic_vector( 7 downto 0) := x"ff"; -- pwm brightness control
@@ -50,26 +53,38 @@ architecture rtl of LedStripMmioWrapper is
   constant CR_INI_C   : std_logic_vector( 7 downto 0) := (others => '0');
   signal cr           : std_logic_vector( 7 downto 0) := (others => '0');
 
-  signal fdr          : std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
+  signal fdr          : std_logic_vector( 7 downto 0) := FDRVAL_C;
 
-  signal div          : unsigned(31 downto 0)         := to_unsigned(DIV_G - 1, 32);
-  signal div_init     : unsigned(31 downto 0)         := to_unsigned(DIV_G - 1, 32);
+  signal div          : unsigned(31 downto 0)         := to_unsigned(DIV_C, 32);
+  signal div_init     : unsigned(31 downto 0)         := to_unsigned(DIV_C, 32);
 
   signal dbg          : std_logic_vector(31 downto 0);
   signal malErrors    : std_logic_vector(31 downto 0);
+  signal nakErrors    : std_logic_vector(31 downto 0);
+  signal rbkErrors    : std_logic_vector(31 downto 0);
   signal locRst       : std_logic;
 
   signal grayEnc      : std_logic;
+
+  signal raddr_w      : unsigned(raddr'left downto 2);
+  signal waddr_w      : unsigned(waddr'left downto 2);
 begin
+
+  raddr_w   <= unsigned(raddr(raddr_w'range));
+  waddr_w   <= unsigned(waddr(waddr_w'range));
 
   locRst    <= cr(0);
   grayEnc   <= not cr(1);
   rst       <= (not rstn) or locRst;
 
-  rdata <= pulseid(31 downto 0)                              when raddr(3 downto 2) = "00" else 
-           fdr & cr & pwm & iref                             when raddr(3 downto 2) = "01" else
-           std_logic_vector(div_init + 1)                    when raddr(3 downto 2) = "10" else
-           dbg;
+  rdata <= pulseid(31 downto 0)                              when raddr_w = 0 else
+           fdr & cr & pwm & iref                             when raddr_w = 1 else
+           std_logic_vector(div_init + 1)                    when raddr_w = 2 else
+           dbg                                               when raddr_w = 3 else
+           malErrors                                         when raddr_w = 4 else
+           nakErrors                                         when raddr_w = 5 else
+           rbkErrors                                         when raddr_w = 6 else
+           (others => '0');
 
   P_SEQ  : process( clk ) is
   begin
@@ -87,11 +102,11 @@ begin
           div <= div - 1;
         end if;
         if ( ws = '1' ) then
-          if ( waddr(3 downto 2) = "00" ) then
+          if    ( waddr_w = 0 ) then
             if ( wstrb = x"f" ) then
               pulseid <= x"0000_0000" & wdata;
             end if;
-          elsif ( waddr(3 downto 2) = "01" ) then
+          elsif ( waddr_w = 1 ) then
             if ( wstrb(0) = '1' ) then
               iref <= wdata(7 downto 0);
             end if;
@@ -104,7 +119,7 @@ begin
             if ( wstrb(3) = '1' ) then
               fdr  <= wdata(31 downto 24);
             end if;
-          elsif ( waddr(3 downto 2) = "10" ) then
+          elsif ( waddr_w = 2 ) then
             if ( wstrb = x"f" ) then
               div_init <= unsigned(wdata) - 1;
             end if;
@@ -116,7 +131,7 @@ begin
 
   U_LED : entity work.LedStripController
     generic map (
-      I2C_FDRVAL_G     => I2C_FDRVAL_G
+      I2C_FDRVAL_G     => FDRVAL_C
     )
     port map (
       rst              => rst,
@@ -128,7 +143,11 @@ begin
       iref             => iref,
       busy             => bsy,
       grayCode         => grayEnc,
+
       malErrors        => malErrors,
+      nakErrors        => nakErrors,
+      rbkErrors        => rbkErrors,
+
       fdrRegValid      => '1',
       fdrRegData       => fdr,
 
