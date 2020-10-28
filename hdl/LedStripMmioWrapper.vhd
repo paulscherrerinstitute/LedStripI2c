@@ -8,7 +8,8 @@ entity LedStripMmioWrapper is
   generic (
     BUS_FREQ_G   : natural                            := 100000000;
     UPDATE_MS_G  : positive                           := 10;
-    ADDR_W_G     : positive                           := 5
+    ADDR_W_G     : positive                           := 5;
+    NUM_LEDS_G   : positive range 1 to 32             := 30
   );
   port (
     clk          : in  std_logic;
@@ -46,6 +47,7 @@ architecture rtl of LedStripMmioWrapper is
 
   signal strobe       : std_logic                     := '0';
   signal pulseid      : std_logic_vector(63 downto 0) := (others => '0');
+  signal pulseid_o    : std_logic_vector(63 downto 0) := (others => '0');
   signal pwm          : std_logic_vector( 7 downto 0) := x"ff"; -- pwm brightness control
   signal iref         : std_logic_vector( 7 downto 0) := x"80"; -- analog brightness control
 
@@ -67,6 +69,7 @@ architecture rtl of LedStripMmioWrapper is
   signal locRst       : std_logic;
 
   signal grayEnc      : std_logic;
+  signal markerEn     : std_logic;
 
   signal raddr_w      : unsigned(raddr'left downto 2);
   signal waddr_w      : unsigned(waddr'left downto 2);
@@ -77,6 +80,7 @@ begin
 
   locRst    <= cr(0);
   grayEnc   <= not cr(1);
+  markerEn  <= cr(2);
   rst       <= (not rstn) or locRst;
 
   rdata <= pulseid(31 downto 0)                              when raddr_w = 0 else
@@ -87,6 +91,18 @@ begin
            nakErrors                                         when raddr_w = 5 else
            rbkErrors                                         when raddr_w = 6 else
            (others => '0');
+
+  P_MARK : process ( markerEn, pulseid ) is
+    variable v : std_logic_vector(pulseid'range);
+  begin
+    if ( markerEn = '1' ) then
+      v := pulseid(pulseid'left - 1 downto 0) & '1';
+      v( NUM_LEDS_G - 1 ) := '1';
+    else
+      v := pulseid;
+    end if;
+    pulseid_o <= v;
+  end process P_MARK;
 
   P_SEQ  : process( clk ) is
   begin
@@ -140,7 +156,7 @@ begin
       clk              => clk,
 
       strobe           => strobe,
-      pulseid          => pulseid,
+      pulseid          => pulseid_o,
       pwm              => pwm,
       iref             => iref,
       busy             => bsy,
