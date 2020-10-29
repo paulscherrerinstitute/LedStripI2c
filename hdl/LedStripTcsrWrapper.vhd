@@ -256,7 +256,8 @@ begin
         PULSEID_OFFSET_G      => PULSEID_OFFSET_G,
         PULSEID_BIGEND_G      => PULSEID_BIGEND_G,
         PULSEID_LENGTH_G      => PULSEID_LENGTH_G,
-        USE_ASYNC_OUTP_G      => ASYNC_CLOCKS_G
+        USE_ASYNC_OUTP_G      => ASYNC_CLOCKS_G,
+        PULSEID_WDOG_P_G      => PULSEID_WDOG_P_C
       )
       port map (
            clk                => evrClk,
@@ -270,7 +271,9 @@ begin
            oclk               => tcsrCLK,
            orst               => tcsrRST,
            pulseid            => pulseid,
-           pulseidStrobe      => pulseidValid
+           pulseidStrobe      => pulseidValid,
+           synErrors          => synErrors,
+           wdgErrors          => wdgErrors
       );
 
   end block B_PulseIdExtractor;
