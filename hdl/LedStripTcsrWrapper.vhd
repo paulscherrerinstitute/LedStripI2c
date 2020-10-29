@@ -42,7 +42,7 @@ entity LedStripTcsrWrapper is
     tcsrCLK      : in  std_logic;
     tcsrRST      : in  std_logic;
 
-    tcsrADD      : in  std_logic_vector( 4 downto 2);
+    tcsrADD      : in  std_logic_vector( 5 downto 2);
     tcsrDATW     : in  std_logic_vector(31 downto 0);
     tcsrWE       : in  std_logic_vector( 3 downto 0);
     tcsrDATR     : out std_logic_vector(31 downto 0);
@@ -152,13 +152,15 @@ architecture rtl of LedStripTcsrWrapper is
   constant TCSR_RBKERR_IDX_C : natural := 4;
   constant TCSR_SYNERR_IDX_C : natural := 5;
   constant TCSR_WDGERR_IDX_C : natural := 6;
-  constant TCSR_DBG_IDX_C    : natural := 7;
+  constant TCSR_PIDCNT_IDX_C : natural := 7;
+  constant TCSR_DBG_IDX_C    : natural := 8;
 
   signal malErrors           : std_logic_vector(31 downto 0);
   signal nakErrors           : std_logic_vector(31 downto 0);
   signal rbkErrors           : std_logic_vector(31 downto 0);
   signal synErrors           : std_logic_vector(31 downto 0);
   signal wdgErrors           : std_logic_vector(31 downto 0);
+  signal pulseidCnt          : std_logic_vector(31 downto 0);
   signal dbg                 : std_logic_vector(31 downto 0);
 
   signal sdaDirLoc           : std_logic;
@@ -198,6 +200,7 @@ begin
               rbkErrors    when (wordAddr = TCSR_RBKERR_IDX_C) else
               synErrors    when (wordAddr = TCSR_SYNERR_IDX_C) else
               wdgErrors    when (wordAddr = TCSR_WDGERR_IDX_C) else
+              pulseidCnt   when (wordAddr = TCSR_PIDCNT_IDX_C) else
               dbg;
 
   P_TCSR_WRITE : process ( tcsrCLK ) is
@@ -307,7 +310,8 @@ begin
            pulseid            => pulseid,
            pulseidStrobe      => pulseidValid,
            synErrors          => synErrors,
-           wdgErrors          => wdgErrors
+           wdgErrors          => wdgErrors,
+           pulseidCnt         => pulseidCnt
       );
 
   end block B_PulseIdExtractor;
