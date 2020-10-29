@@ -35,7 +35,7 @@ entity LedStripTcsrWrapper is
     -- received from the EVR stream within this timeout period
     -- then the 'missing pulseID' counter is incremented.
     -- Setting this to 0.0 disables the watchdog.
-    PULSEID_WDOG_PER_MS_G : real                          := 12.0
+    PULSEID_WDOG_PER_MS_G : real                          := 12.0;
     -- Version (optional git hash)
     VERSION_G             : std_logic_vector(27 downto 0) := (others => '0')
   );
