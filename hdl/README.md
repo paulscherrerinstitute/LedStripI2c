@@ -58,6 +58,7 @@ The most-significant 28 bits optionally contain a (binary-encoded) git
 hash (all-zero when unused).
 
 ### Clock Divider
+
 The i2c SCL clock is derived from the bus clock fed into the firmware module.
 
     SCL_clock = Bus_clock / divider_value / 4
@@ -72,6 +73,7 @@ If the MSbit is clear then the divider is taken from a table of larger values (c
 the firmware sources for details).
 
 ### Trigger Multiplexer
+
 The firmware has 16 inputs for (Evr-generated) triggers which can be used to decimate
 the rate at which the display updates (useful for slow cameras). The multiplexer selects
 one of these triggers. By default trigger #0 is permanently asserted 1 (which results in
@@ -79,6 +81,7 @@ the display updating every time a new pulse-ID streams out of the EVR) and trigg
 permanently asserted 0 (which results in the display not updating).
 
 ### Marker
+
 If the marker is enabled then the displayed pulse-ID is shifted left by one bit and ORed
 with a mask (contents of register R2):
 
@@ -88,16 +91,19 @@ This feature can be used to permanently light some 'marker' LEDs. If the marker 
 then register R2 is ignored.
 
 ### Encoding
+
 The pulse-ID can be displayed in binary- or gray-encoding. The latter has obvious advantages
 when capturing the display with a camera. If exposure-time overlaps the change of the pulse-ID
 then the relative brightness of the changing LED confers some information about the timing of
 the shutter. It also avoids any ambiguity of a not properly synchronized readout.
 
 ### Reset
+
 While this bit is asserted the firmware block (including the i2c controller) is held in reset.
 Note that the reset does not extend to the remote PCA9955 LED controllers.
 
 ### PWM and IREF
+
 The PCA9955 supports controlling LED brightness by two (cumulative) methods: PWM at a frequency
 of multiple kHz as well as modulating an analog current source. Both parameters can be programmed
 in the control register.
@@ -111,6 +117,7 @@ in the control register.
         to forward the PWM and IREF to all 32 channels in the PCA9955 devices).
 
 ### Error counters
+
 The counters keep track of
 
  - Lost i2c arbitrations. Because normally (i.e., unless the USB-i2c bridge or the PMOD connector
@@ -136,3 +143,84 @@ The readback error counter can be used to ensure that all pulse-IDs have been pr
 correctly to the display hardware. The watchdog error counter can be used to verify that
 pulse-Ids are received and the sequence error counter can be used to verify that the
 received pulse-Ids are sequential.
+
+## Firmware Module
+
+The top level entity is defined in [LedStripTcsrWrapper.vhd](LedStripTcsrWrapper.vhd).
+
+### Generics
+
+Most of the generics have reasonable default values but a value for the bus frequency must
+be supplied by the user.
+
+| Generic                |Default Value| Description                                          |
+|------------------------|-------------|------------------------------------------------------|
+|  TCSR_CLOCK_FRQ_G      |             | Bus Frequency (Hz)                                   |
+|  DFLT_I2C_SCL_FRQ_G    | 400.0E3     | Default SCL Frequency (Hz)                           |
+|  PULSEID_OFFSET_G      | 52          | Starting offset of pulse-id in EVR stream            |
+|  PULSEID_LENGTH_G      |  8          | Size of pulse-id (in bytes)                          |
+|  PULSEID_BIGEND_G      | false       | Representation in EVR stream (big- vs. little-endian)|
+|  ASYNC_CLOCKS_G        | true        | Whether the bus- and evr-clocks are asynchronous     |
+|  I2C_ADDR_R_G          | "0000101"   | I2C (7-bit) address of RHS PCA9955                   |
+|  I2C_ADDR_L_G          | "1101001"   | I2C (7-bit) address of LHS PCA9955                   |
+|  I2C_SYNC_STAGES_G     | 3           | How many synchronizer stages on SCL/SDA inputs       |
+|  I2C_DEBOUNCE_CYCLES_G | 10          | For how many bus-cycles to debounce SCL/SDA inputs   |
+|  NUM_LEDS_G            | 30          | How many LEDs are physically loaded on the board     |
+|  DFLT_MARKER_ENABLE_G  | '1'         | Default value of marker-enable bit in R0             |
+|  PULSEID_WDOG_PER_MS_G | 12.0        | Pulse-Id watchdog timeout [ms]; disabled when 0.0    |
+|  VERSION_G             | x"000_0000" | Firmware Version ID (e.g., git-hash)                 |
+
+*Note*: The i2c addresses of the PCA9955 controllers is defined by hardware straps on the board
+        but there are *slightly different versions of the PCA9955* which interpret the strapping
+        differently (PCA9955 vs. PCA9955B). Consult the KiCad schematics and hardware manuals for
+        details.
+
+### Ports
+
+The module's ports are listed in the following table. Signals are in the clock-domain of the last
+clock previously listed.
+
+|  Signal   |     Type/Default                             | Description       |
+|-----------|----------------------------------------------|-------------------|
+|  tcsrCLK  | in  std_logic                                |  Bus clock        |
+|  tcsrRST  | in  std_logic                                |  Synchronous reset|
+|  tcsrADD  | in  std_logic_vector( 4 downto 2)            |  (Word-) address  |
+|  tcsrDATW | in  std_logic_vector(31 downto 0)            |  Write data       |
+|  tcsrWE   | in  std_logic_vector( 3 downto 0)            |  Lane write-enable|
+|  tcsrDATR | out std_logic_vector(31 downto 0)            |  Read data        |
+|  tcsrWR   | in  std_logic                                |  Write strobe     |
+|  tcsrRD   | in  std_logic                                |  Read strobe      |
+|  tcsrACK  | out std_logic                                |  ACK (always '1') |
+|  tcsrERR  | out std_logic                                |  ERR (always '0') |
+|  sclInp   | in  std_logic                                |  i2c SCL input    |
+|  sclOut   | out std_logic                                |  i2c SCL output   |
+|  sdaInp   | in  std_logic                                |  i2c SDA input    |
+|  sdaOut   | out std_logic                                |  i2c SDA output   |
+|  evrClk   | in  std_logic                                |  EVR clock        |
+|  evrStream| in  EvrStreamType                            |  EVR data stream  |
+|  ledTrig  | in  std_logic_vector(15 downto 0) := x"0001" |  Update trigger   |
+
+### Constraints
+
+If the bus- and evr- clocks are asynchronous then some details need to be
+considered: There are two clock-domain crossings in the module
+
+ - The pulse-ID is taken from the `evrClk` into the `tcsrCLK` domain. If the
+   `ASYNC_CLOCKS_G` generic is set to `true` then a synchronizer stage is
+   instantiated which synchronizes and delays the pulse-ID strobe signal until
+   the (parallel) pulse-ID has stabilized and can be safely read into the `tcslCLK`
+   domain. A proper `DATAPATHONLY` constraint should be defined:
+
+    INST "*B_PulseIdExtractor.U_GetPid/r_pulseid_*" TNM = LEDSTRIP_PULSEID_REG;
+    TIMESPEC TS_<name> = FROM "LEDSTRIP_PULSEID_REG" TO <tnm_of_bus_clock_domain> <delay> DATAPATHONLY;
+
+   The user has to provide proper definitions for the items in angled-brackets. The
+   maximum datapath delay should limit any delay to less than the two bus-cycles delay
+   of the strobe signal. Some margin needs to allocated to possible clock skew!
+
+ - The trigger multiplexer setting crosses from the `tcsrCLK` into the `evrCLK` domain.
+   Assuming that this setting remains mostly stable and we don't care about glitches
+   during a change of the mux setting we can set a false-path:
+
+    INST "*B_PulseIdExtractor.trgMuxEvr_*"          TNM = LEDSTRIP_MUX_REG;
+    TIMESPEC TS_<name> = FROM <tnm_of_bus_clock_domain> TO "LEDSTRIP_MUX_REG" TIG;
