@@ -11,31 +11,33 @@ entity LedStripTcsrWrapper is
     -- tcsrl clock frequence [Hz]
     TCSR_CLOCK_FRQ_G      : real;
     -- default SCL frequency [Hz]; may change at run-time
-    DFLT_I2C_SCL_FRQ_G    : real                         := 400.0E3;
+    DFLT_I2C_SCL_FRQ_G    : real                          := 400.0E3;
     -- offset in evr stream
-    PULSEID_OFFSET_G      : natural                      := 52;
+    PULSEID_OFFSET_G      : natural                       := 52;
     -- length in octets
-    PULSEID_LENGTH_G      : positive                     :=  8;
-    PULSEID_BIGEND_G      : boolean                      := false;
+    PULSEID_LENGTH_G      : positive                      :=  8;
+    PULSEID_BIGEND_G      : boolean                       := false;
     -- tcsr and evr clocks are asynchronous
-    ASYNC_CLOCKS_G        : boolean                      := true;
+    ASYNC_CLOCKS_G        : boolean                       := true;
     -- I2C Address of RHS PCA9955B
-    I2C_ADDR_R_G          : std_logic_vector(6 downto 0) := "0000101";
+    I2C_ADDR_R_G          : std_logic_vector(6 downto 0)  := "0000101";
     -- I2C Address of LHS PCA9955B
-    I2C_ADDR_L_G          : std_logic_vector(6 downto 0) := "1101001";
+    I2C_ADDR_L_G          : std_logic_vector(6 downto 0)  := "1101001";
     -- Synchronizer stages for reading scalInp/sdaInp
-    I2C_SYNC_STAGES_G     : natural range 0 to 3         := 3;
+    I2C_SYNC_STAGES_G     : natural range 0 to 3          := 3;
     -- For how many (tcsr) cycles to debounce sclInp, sdaInp
-    I2C_DEBOUNCE_CYCLES_G : natural                      := 10;
+    I2C_DEBOUNCE_CYCLES_G : natural                       := 10;
     -- V1 has 
-    NUM_LEDS_G            : natural range 1 to 32        := 30;
+    NUM_LEDS_G            : natural range 1 to 32         := 30;
     -- Enable default marker
-    DFLT_MARKER_ENABLE_G  : std_logic                    := '1';
+    DFLT_MARKER_ENABLE_G  : std_logic                     := '1';
     -- Pulse ID watchdog timeout (in ms); if no new pulse ID is
     -- received from the EVR stream within this timeout period
     -- then the 'missing pulseID' counter is incremented.
     -- Setting this to 0.0 disables the watchdog.
-    PULSEID_WDOG_PER_MS_G : real                         := 12.0
+    PULSEID_WDOG_PER_MS_G : real                          := 12.0
+    -- Version (optional git hash)
+    VERSION_G             : std_logic_vector(27 downto 0) := (others => '0')
   );
   port (
     -- TCSR clock domain
@@ -65,6 +67,11 @@ entity LedStripTcsrWrapper is
 end entity LedStripTcsrWrapper;
 
 architecture rtl of LedStripTcsrWrapper is
+
+  -- register map version
+  constant REG_VERSION_C : std_logic_vector( 3 downto 0) := x"0";
+
+  constant VERSION_C     : std_logic_vector(31 downto 0) := (VERSION_G & REG_VERSION_C);
 
   function getWdogCount(busFreqHz : real; timeoutMs : real) return natural is
     variable v   : real;
@@ -145,16 +152,17 @@ architecture rtl of LedStripTcsrWrapper is
 
   signal cr32Rbk             : std_logic_vector(31 downto 0);
 
-  constant TCSR_CR_IDX_C     : natural := 0;
-  constant TCSR_MARK_IDX_C   : natural := 1;
-  constant TCSR_MALERR_IDX_C : natural := 2;
-  constant TCSR_NAKERR_IDX_C : natural := 3;
-  constant TCSR_RBKERR_IDX_C : natural := 4;
-  constant TCSR_SEQERR_IDX_C : natural := 5;
-  constant TCSR_WDGERR_IDX_C : natural := 6;
-  constant TCSR_PIDCNT_IDX_C : natural := 7;
-  constant TCSR_SYNERR_IDX_C : natural := 8;
-  constant TCSR_DBG_IDX_C    : natural := 9;
+  constant TCSR_REGVER_IDX_C : natural := 0;
+  constant TCSR_CR_IDX_C     : natural := 1;
+  constant TCSR_MARK_IDX_C   : natural := 2;
+  constant TCSR_MALERR_IDX_C : natural := 3;
+  constant TCSR_NAKERR_IDX_C : natural := 4;
+  constant TCSR_RBKERR_IDX_C : natural := 5;
+  constant TCSR_SEQERR_IDX_C : natural := 6;
+  constant TCSR_WDGERR_IDX_C : natural := 7;
+  constant TCSR_PIDCNT_IDX_C : natural := 8;
+  constant TCSR_SYNERR_IDX_C : natural := 9;
+  constant TCSR_DBG_IDX_C    : natural :=10;
 
   signal malErrors           : std_logic_vector(31 downto 0);
   signal nakErrors           : std_logic_vector(31 downto 0);
@@ -195,7 +203,8 @@ begin
   end process P_MARK;
 
   wordAddr <= unsigned(tcsrADD);
-  tcsrDATR <= cr32Rbk      when (wordAddr = TCSR_CR_IDX_C    ) else
+  tcsrDATR <= VERSION_C    when (wordAddr = TCSR_REGVER_IDX_C) else
+              cr32Rbk      when (wordAddr = TCSR_CR_IDX_C    ) else
               r.mark       when (wordAddr = TCSR_MARK_IDX_C  ) else
               malErrors    when (wordAddr = TCSR_MALERR_IDX_C) else
               nakErrors    when (wordAddr = TCSR_NAKERR_IDX_C) else

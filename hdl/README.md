@@ -20,22 +20,23 @@ The firmware implements the following features:
  - display pulse-ID as gray-encoded or binary number.
  - error/status counters.
 
-## Register Map
+## Register Map (Version 0)
 
 All registers are 32-bit. The address given in this table is
 the register index (= word-address), not a byte address:
 
 | Register   | Access | Function                             |
 |------------|--------|--------------------------------------|
-|  0         | R/W    | Control Register                     |
-|  1         | R/W    | Marker/Mask                          |
-|  2         | RO     | I2C Arbitration Lost Counter         |
-|  3         | RO     | I2C Write Not Acknowledged Counter   |
-|  4         | RO     | Readback Error/Mismatch Counter      |
-|  5         | RO     | Pulse-Id Sequence Error Counter      |
-|  6         | RO     | Pulse-Id Watchdog Error Counter      |
-|  7         | RO     | Display-update Trigger Counter       |
-|  8         | RO     | Stream Synchronization Error Counter |
+|  0         | RO     | Version Register                     |
+|  1         | R/W    | Control Register                     |
+|  2         | R/W    | Marker/Mask                          |
+|  3         | RO     | I2C Arbitration Lost Counter         |
+|  4         | RO     | I2C Write Not Acknowledged Counter   |
+|  5         | RO     | Readback Error/Mismatch Counter      |
+|  6         | RO     | Pulse-Id Sequence Error Counter      |
+|  7         | RO     | Pulse-Id Watchdog Error Counter      |
+|  8         | RO     | Display-update Trigger Counter       |
+|  9         | RO     | Stream Synchronization Error Counter |
 
 The control register provides the following functionality
 (Defaults marked with 'G' can be changed by setting a VHDL generic)
@@ -49,6 +50,12 @@ The control register provides the following functionality
 | [16]     | 0                 | Reset firmware block (held in reset while bit is set)  |
 | [15:08]  | 255               | Brightness PWM setting for PCA9955                     |
 | [07:00]  | 128               | Brightness IREF current setting for PCA9955            |
+
+### Version Register
+The least-significant 4 bits of the version register define the version
+of the register layout (version 0 described in this document).
+The most-significant 28 bits optionally contain a (binary-encoded) git
+hash (all-zero when unused).
 
 ### Clock Divider
 The i2c SCL clock is derived from the bus clock fed into the firmware module.
@@ -73,12 +80,12 @@ permanently asserted 0 (which results in the display not updating).
 
 ### Marker
 If the marker is enabled then the displayed pulse-ID is shifted left by one bit and ORed
-with a mask (contents of register R1):
+with a mask (contents of register R2):
 
     displayed_pattern :=  (pulse_id << 1) | mask
 
 This feature can be used to permanently light some 'marker' LEDs. If the marker is disabled
-then register R1 is ignored.
+then register R2 is ignored.
 
 ### Encoding
 The pulse-ID can be displayed in binary- or gray-encoding. The latter has obvious advantages
