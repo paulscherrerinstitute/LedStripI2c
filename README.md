@@ -5,11 +5,11 @@ The LEDs are driven by PCA9955 LED controllers
 and remote-controlled by I2C over a fiber
 connection.
 
- - kicad/    schematics and pcb
- - hdl/      vhdl code for driving the device from a FPGA
-             [see README](hdl/README.md)
- - pythone/  python scripts to drive the device from the USB/I2C
-             adapter (for testing).
+ - [kicad/](kicad/)   [schematics](kicad/ledstrip-sch.pdf) and pcb
+ - [hdl/](hdl/)       vhdl code for driving the device from a FPGA
+                      ([documentation](hdl/README.md)).
+ - [python/](python/) python scripts to drive the device from the USB/I2C
+                      adapter (for testing).
 
 The LED device's I2C bus is accessible by three methods:
 
