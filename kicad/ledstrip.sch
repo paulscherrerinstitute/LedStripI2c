@@ -1,6 +1,5 @@
 EESchema Schematic File Version 4
-LIBS:ledstrip-cache
-EELAYER 26 0
+EELAYER 30 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
@@ -9,7 +8,7 @@ Title "LED Strip"
 Date "2020-10-13"
 Rev "1.0"
 Comp "PSI"
-Comment1 ""
+Comment1 "Till Straumann, 10/2020"
 Comment2 ""
 Comment3 ""
 Comment4 ""
@@ -883,8 +882,6 @@ F 3 "" H 3950 5850 50  0001 C CNN
 	1    3950 5850
 	1    0    0    -1  
 $EndComp
-Text Notes 4200 7600 0    50   ~ 0
-Reduce TMIT current!!\n
 Wire Wire Line
 	5250 6250 5250 6450
 Connection ~ 5250 6450
