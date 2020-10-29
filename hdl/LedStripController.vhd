@@ -31,6 +31,8 @@ entity LedStripController is
     fdrRegData   : in  std_logic_vector( 7 downto 0) := I2C_FDRVAL_G;
 
     malErrors    : out std_logic_vector(31 downto 0);
+    nakErrors    : out std_logic_vector(31 downto 0);
+    rbkErrors    : out std_logic_vector(31 downto 0);
 
     sdaDir       : out std_logic;
     sdaOut       : out std_logic;
@@ -48,11 +50,13 @@ architecture rtl of LedStripController is
   constant NUM_LEDS_PER_CONTROLLER_C : natural := 16;
   constant NUM_LEDS_C                : natural := NUM_CTRL_C * NUM_LEDS_PER_CONTROLLER_C;
 
-  subtype  Slv8           is std_logic_vector(7 downto 0);
-  subtype  U8             is unsigned        (7 downto 0);
+  subtype  Slv8           is std_logic_vector( 7 downto 0);
+  subtype  U8             is unsigned        ( 7 downto 0);
+  subtype  Slv32          is std_logic_vector(31 downto 0);
+  subtype  U32            is unsigned        (31 downto 0);
   subtype  PidType        is std_logic_vector(NUM_LEDS_C - 1 downto 0);
 
-  subtype  I2cAddrType    is std_logic_vector(6 downto 0);
+  subtype  I2cAddrType    is std_logic_vector( 6 downto 0);
 
   constant SL_ONE_C        : std_logic := '1';
 
@@ -77,15 +81,23 @@ architecture rtl of LedStripController is
     SEQ_STOP & x"00"               -- STOP updates BOTH controllers' displays
   );
 
-  constant SEND_BYTE_PROG_C : MpcI2cSequenceArray := (
-    SEQ_NORM & I2C_ADDR_R_G & "0", -- i2c address
+  constant READBACK_PID_AND_SEND_BYTE_PROG_C : MpcI2cSequenceArray := (
+    SEQ_NORM & I2C_ADDR_R_G & "0",
+    SEQ_NORM & Slv8(LED_MODE_ADDR_C),
+    SEQ_RSRT & I2C_ADDR_R_G & "1",
+    SEQ_NORM & x"03",              -- read-back 4 bytes
+    SEQ_RSRT & I2C_ADDR_L_G & "0",
+    SEQ_NORM & Slv8(LED_MODE_ADDR_C),
+    SEQ_RSRT & I2C_ADDR_L_G & "1",
+    SEQ_NORM & x"03",              -- read-back 4 bytes
+    SEQ_RSRT & I2C_ADDR_R_G & "0", -- i2c address
     SEQ_NORM & Slv8(LED_IREF_ADDR_C),
     SEQ_STOP & x"00"               -- data
   );
 
   constant PROGS_INIT_C       : MpcI2cSequenceArray := (
     SHOW_PID_PROG_C &
-    SEND_BYTE_PROG_C
+    READBACK_PID_AND_SEND_BYTE_PROG_C
   );
 
   constant PROGS_LENGTH_C     : natural := PROGS_INIT_C'length;
@@ -95,17 +107,19 @@ architecture rtl of LedStripController is
   subtype  PCType            is natural range 0 to PROGS_LENGTH_C - 1;
 
   constant SHOW_PID_ADDR_C    : natural := 0;
-  constant SEND_BYTE_ADDR_C   : natural := SHOW_PID_PROG_C'length;
+  constant RBCK_PID_ADDR_C    : natural := SHOW_PID_PROG_C'length;
 
   constant CTL_OFF_C          : natural := 2; -- offset of first control byte (LHS controller)
   constant CTL_NBYTES_C       : natural := 4; -- 4 control bytes control 16 LEDs
 
-  constant BRI_I2C_OFF_C      : natural := 0;
-  constant BRI_ADR_OFF_C      : natural := 1;
-  constant BRI_VAL_OFF_C      : natural := 2;
+  constant BRI_I2C_OFF_C      : natural := 0 + 8;
+  constant BRI_ADR_OFF_C      : natural := 1 + 8;
+  constant BRI_VAL_OFF_C      : natural := 2 + 8;
 
   constant PWM_INI_C          : Slv8 := x"FF";
   constant IREF_INI_C         : Slv8 := x"80";
+
+  subtype  RbkCountType   is natural range 0 to CTL_NBYTES_C * NUM_CTRL_C;
 
   type StateType is (WAIT_READY, IDLE, START_SHOW_PID, START_SET_BRIGHTNESS);
 
@@ -119,6 +133,8 @@ architecture rtl of LedStripController is
     iref        :  Slv8;
     briAddr     :  U8;
     briData     :  Slv8;
+    rbkCount    :  RbkCountType;
+    rbkErrors   :  U32;
   end record RegType;
 
   constant REG_INIT_C : RegType := (
@@ -130,7 +146,9 @@ architecture rtl of LedStripController is
     pwm         => PWM_INI_C,
     iref        => IREF_INI_C,
     briAddr     => LED_IREF_ADDR_C,
-    briData     => IREF_INI_C
+    briData     => IREF_INI_C,
+    rbkCount    => RbkCountType'high,
+    rbkErrors   => (others => '0')
   );
 
   procedure setPID(
@@ -194,6 +212,13 @@ architecture rtl of LedStripController is
   signal sclInpFiltered : std_logic;
   signal sdaInpFiltered : std_logic;
 
+  signal readbackData   : std_logic_vector(7 downto 0);
+  signal readbackValid  : std_logic;
+  signal progError      : std_logic;
+
+  signal offDbg         : natural;
+  signal rboffDbg       : std_logic_vector(7 downto 0);
+
 begin
 
   P_MEM  : process( clk ) is
@@ -204,20 +229,39 @@ begin
       else
         if ( strobe = '1' and (r.state = IDLE) ) then
           setPID(programs, SHOW_PID_ADDR_C, pulseid(PidType'range), gray => grayCode);
-          setSendByte(programs, SEND_BYTE_ADDR_C, r.briI2c, r.briAddr, r.briData);
+          setSendByte(programs, RBCK_PID_ADDR_C, r.briI2c, r.briAddr, r.briData);
         end if;
       end if;
     end if;
   end process P_MEM;
 
-  P_COMB : process(r, strobe, pulseid, pwm, iref, progReady) is
+  P_COMB : process(r, strobe, pulseid, pwm, iref, progReady, readbackValid, readbackData) is
     variable v     : RegType;
+    variable off   : PCType;
   begin
     v          := r;
+    if ( readbackValid = '1' ) then
+      -- incur a bound-check failure during simulation since the combinatorial
+      -- process increments v.rbkCount if not checked
+      if ( r.rbkCount < RbkCountType'high ) then
+        v.rbkCount := r.rbkCount + 1;
+      end if;
+      off := SHOW_PID_ADDR_C + CTL_OFF_C + r.rbkCount;
+      if ( r.rbkCount >= CTL_NBYTES_C ) then
+        off := off + CTL_OFF_C;
+      end if;
+      offDbg <= off;
+      rboffDbg <= programs(off)(7 downto 0);
+      if ( readbackData /= programs(off)(7 downto 0) ) then
+        v.rbkErrors := r.rbkErrors + 1;
+      end if;
+    end if;
     case ( r.state ) is
       when WAIT_READY =>
         if ( progReady = '1' ) then
-          v.state := IDLE;
+          v.state     := IDLE;
+          v.rbkErrors := r.rbkErrors + (RbkCountType'high - r.rbkCount);
+          v.rbkCount  := 0;
         end if;
 
       when IDLE =>
@@ -231,7 +275,7 @@ begin
       when START_SHOW_PID =>
         if ( (r.progValid and progReady) = '1' ) then
           v.state   := START_SET_BRIGHTNESS;
-          v.progPtr := SEND_BYTE_ADDR_C;
+          v.progPtr := RBCK_PID_ADDR_C;
         end if;
 
       when START_SET_BRIGHTNESS =>
@@ -299,10 +343,16 @@ begin
       memPtrValid   => r.progValid,
       memPtrReady   => progReady,
 
+      progError     => progError,
+
       fdrRegValid   => fdrRegValid,
       fdrRegData    => fdrRegData,
 
       malErrors     => malErrors,
+      nakErrors     => nakErrors,
+
+      readData      => readbackData,
+      readValid     => readbackValid,
 
       sdaDir        => sdaDir,
       sdaOut        => sdaOut,
@@ -317,6 +367,8 @@ begin
   dbgState(19)           <= '0';
 
   busy                   <= '1' when (r.state /= IDLE) else '0';
+
+  rbkErrors              <= std_logic_vector(r.rbkErrors);
  
 end architecture rtl;
 

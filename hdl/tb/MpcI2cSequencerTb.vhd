@@ -26,7 +26,8 @@ architecture sim of MpcI2cSequencerTb is
     );
   end component i2cRamSlave;
 
-  constant I2C_ADDR_C : std_logic_vector(6 downto 0) := "1010000";
+  constant I2C_ADDR_C       : std_logic_vector(6 downto 0) := "1010000";
+  constant I2C_ADDR_BOGUS_C : std_logic_vector(6 downto 0) := "1011000";
 
   signal SDA, SCL : std_logic;
 
@@ -42,6 +43,11 @@ architecture sim of MpcI2cSequencerTb is
 
   signal run      : boolean := true;
   signal cnt      : natural := 0;
+  signal rbaddr   : natural := 0;
+  signal readData : std_logic_vector( 7 downto  0);
+  signal readValid: std_logic;
+  signal progError: std_logic;
+  signal nakErrors: std_logic_vector(31 downto  0);
 
   constant memory : MpcI2cSequenceArray := (
     "00" & I2C_ADDR_C & "0",
@@ -54,7 +60,13 @@ architecture sim of MpcI2cSequencerTb is
     "01" & I2C_ADDR_C & "0",
     "00" & x"08",
     "00" & x"88",
-    "11" & x"89"
+    "11" & x"89",
+    "00" & I2C_ADDR_C & '0',
+    "00" & x"00",
+    "01" & I2C_ADDR_C & '1',
+    "11" & x"0F",
+    "00" & I2C_ADDR_BOGUS_C & '1',
+    "11" & x"03"
   );
   constant MEM_DEPTH_C     : natural := memory'length;
 
@@ -67,7 +79,7 @@ architecture sim of MpcI2cSequencerTb is
 
   type     ProgTblArray   is array (natural range <>) of MemPtrType;
   constant PROGS_C         : ProgTblArray := (
-    0, 3
+    0, 3, 11, 15
   );
   signal   progPtr         : natural range 0 to PROGS_C'length - 1 := 0;
 
@@ -129,11 +141,42 @@ begin
   end process P_DRV;
 
   P_TST : process is
+    variable rbExpected : std_logic_vector(7 downto 0);
   begin
 
     while ( ((rst = '1') or (memPtrValid = '1') or (memPtrReady = '0')) ) loop
       wait until rising_edge( clk );
+      if ( readValid = '1' ) then
+        case ( rbaddr ) is
+          when 0      => rbExpected := x"A5";
+          when 4      => rbExpected := x"A4";
+          when 5      => rbExpected := x"A5";
+          when 8      => rbExpected := x"88";
+          when 9      => rbExpected := x"89";
+          when others => rbExpected := x"FF";
+        end case;
+
+        if ( readData /= rbExpected ) then
+          report "Data readback mismatch @" & integer'image(rbaddr) & ": expected " & hstr(rbExpected) & " got " & hstr( readData ) severity failure;
+        end if;
+
+        rbaddr <= rbaddr + 1;
+      end if;
     end loop;
+
+    if ( progError /= '1' ) then
+      report "Expected 'progError' to be asserted (bogus address)" severity failure;
+    end if;
+
+    if ( unsigned(nakErrors) /= 1 ) then
+      report "Expected 1 NAK Errors but got " & hstr(nakErrors) severity failure;
+    end if;
+
+    if ( rbaddr /= 16 ) then
+      report "Expected 16 readback values but got " & integer'image(rbaddr) severity failure;
+    end if;
+
+    report "Test PASSED";
 
     run <= false;
 
@@ -154,6 +197,12 @@ begin
       memPtr           => memPtr,
       memPtrValid      => memPtrValid,
       memPtrReady      => memPtrReady,
+
+      readData         => readData,
+      readValid        => readValid,
+
+      progError        => progError,
+      nakErrors        => nakErrors,
 
       sdaDir           => SDAt,
       sdaOut           => SDAo,

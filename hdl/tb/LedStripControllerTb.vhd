@@ -88,6 +88,7 @@ architecture sim of LedStripControllerTb is
   signal fdrValid : std_logic                     := '0';
 
   signal malErrs  : std_logic_vector(31 downto 0);
+  signal rbkErrs  : std_logic_vector(31 downto 0);
 
   -- if MSBit is set the lower 7 bits are a verbatim value
   signal fdr      : std_logic_vector( 7 downto 0) := "1" & std_logic_vector(to_unsigned(SCL_DIVISOR_C, 7));
@@ -145,6 +146,17 @@ begin
     end if;
   end process P_DRV;
 
+  P_FAIL : process is
+  begin
+    wait until rising_edge(clk);
+      if ( rst = '0' ) then
+        if unsigned(rbkErrs) /= 0 then
+          wait until rising_edge(clk);
+          report "RBERR" severity failure;
+        end if;
+      end if;
+  end process P_FAIL;
+
   P_TST : process is
   begin
 
@@ -157,6 +169,10 @@ begin
 
     if ( unsigned(malErrs) /= 0 ) then
       report "Test FAILED: " & hstr(malErrs) & " arbitration errors (result of filtered signals)" severity failure;
+    end if;
+
+    if ( unsigned(rbkErrs) /= 0 ) then
+      report "Test FAILED: " & hstr(rbkErrs) & " readback errors" severity failure;
     end if;
 
     run <= false;
@@ -180,6 +196,7 @@ begin
       busy             => bsy,
       grayCode         => '0',
       malErrors        => malErrs,
+      rbkErrors        => rbkErrs,
 
       fdrRegValid      => fdrValid,
       fdrRegData       => fdr,
@@ -199,9 +216,16 @@ begin
   signal rdEn     : std_logic;
   signal rdData   : std_logic_vector(8*DATA_SIZE_C-1 downto 0) := (others => 'X');
 
+  type   Slv8Array is array (natural range 0 to 2**(8*ADDR_SIZE_C) - 1) of std_logic_vector(8*DATA_SIZE_C - 1 downto 0);
+
+  signal ram      : Slv8Array := (others => (others => 'X' ));
+
   begin
 
 
+  -- this device always auto-increments; the PCA9955 only does when the MSB of the offset
+  -- that is written to the device is set. We always do that in the LedStripController's 
+  -- programs...
   U_RAM : i2cRegSlaveWrap
     generic map (
       I2C_ADDR_G       => to_integer(unsigned(I2C_ADDR_C(device))),
@@ -228,9 +252,22 @@ begin
     if ( rising_edge( clk ) ) then
       if ( wrEn = '1' ) then
         report "@" & integer'image(device) & "[" & hstr(addr) & "]:= " & hstr(wrData);
+        ram( to_integer( unsigned(addr) ) ) <= wrData;
       end if;
+--      if ( rdEn = '1' ) then
+--        report "RB   @" & integer'image(device) & "[" & hstr(addr) & "]:  " & hstr(rdData);
+--      end if;
     end if;
   end process P_MON;
+
+  P_RBK : process ( rst, ram, addr ) is
+  begin
+    if ( rst = '1' ) then
+      rdData <= (others => 'X');
+    else
+      rdData <= ram( to_integer( unsigned(addr) ) );
+    end if;
+  end process P_RBK;
 
   end generate;
 
