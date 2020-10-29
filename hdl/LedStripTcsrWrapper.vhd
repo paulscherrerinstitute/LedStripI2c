@@ -30,7 +30,12 @@ entity LedStripTcsrWrapper is
     -- V1 has 
     NUM_LEDS_G            : natural range 1 to 32        := 30;
     -- Enable default marker
-    DFLT_MARKER_ENABLE_G  : std_logic                    := '1'
+    DFLT_MARKER_ENABLE_G  : std_logic                    := '1';
+    -- Pulse ID watchdog timeout (in ms); if no new pulse ID is
+    -- received from the EVR stream within this timeout period
+    -- then the 'missing pulseID' counter is incremented.
+    -- Setting this to 0.0 disables the watchdog.
+    PULSEID_WDOG_PER_MS_G : real                         := 12.0
   );
   port (
     -- TCSR clock domain
@@ -61,7 +66,33 @@ end entity LedStripTcsrWrapper;
 
 architecture rtl of LedStripTcsrWrapper is
 
+  function getWdogCount(busFreqHz : real; timeoutMs : real) return natural is
+    variable v   : real;
+    variable min : real;
+  begin
+    if ( timeoutMs = 0.0 ) then
+      return 0;
+    else
+      v := timeoutMs / 1000.0;
+      -- enforce a reasonable minimum:
+      --   i2c bytes: 2 controllers * ( 6 bytes for display + 7 for readback + 3 for brightness update )
+      min := 2.0 * ( 6.0 + 7.0 + 3.0 );
+      --   1 i2c byte: 9 bits
+      min := min * 9.0;
+      -- include some slack for start/stop overhead
+      min := min*1.2;
+      -- fastest i2c speed
+      min := min / 1.0E6;
+      if ( v < min ) then
+        v := min;
+      end if;
+      return natural( busFreqHz * v );
+    end if;
+  end function getWdogCount;
+
+  constant PULSEID_WDOG_P_C  : natural                      := getWdogCount(TCSR_CLOCK_FRQ_G, PULSEID_WDOG_PER_MS_G);
   constant FDRVAL_C          : std_logic_vector(7 downto 0) := getFDRVal(TCSR_CLOCK_FRQ_G, DFLT_I2C_SCL_FRQ_G);
+
   signal pulseid             : std_logic_vector(63 downto 0);
   signal pulseidValid        : std_logic;
   signal pulseid_o           : std_logic_vector(63 downto 0);
@@ -119,11 +150,15 @@ architecture rtl of LedStripTcsrWrapper is
   constant TCSR_MALERR_IDX_C : natural := 2;
   constant TCSR_NAKERR_IDX_C : natural := 3;
   constant TCSR_RBKERR_IDX_C : natural := 4;
-  constant TCSR_DBG_IDX_C    : natural := 5;
+  constant TCSR_SYNERR_IDX_C : natural := 5;
+  constant TCSR_WDGERR_IDX_C : natural := 6;
+  constant TCSR_DBG_IDX_C    : natural := 7;
 
   signal malErrors           : std_logic_vector(31 downto 0);
   signal nakErrors           : std_logic_vector(31 downto 0);
   signal rbkErrors           : std_logic_vector(31 downto 0);
+  signal synErrors           : std_logic_vector(31 downto 0);
+  signal wdgErrors           : std_logic_vector(31 downto 0);
   signal dbg                 : std_logic_vector(31 downto 0);
 
   signal sdaDirLoc           : std_logic;
@@ -161,8 +196,9 @@ begin
               malErrors    when (wordAddr = TCSR_MALERR_IDX_C) else
               nakErrors    when (wordAddr = TCSR_NAKERR_IDX_C) else
               rbkErrors    when (wordAddr = TCSR_RBKERR_IDX_C) else
-              dbg          when (wordAddr = TCSR_DBG_IDX_C   ) else
-              (others => '0');
+              synErrors    when (wordAddr = TCSR_SYNERR_IDX_C) else
+              wdgErrors    when (wordAddr = TCSR_WDGERR_IDX_C) else
+              dbg;
 
   P_TCSR_WRITE : process ( tcsrCLK ) is
   begin
@@ -264,9 +300,7 @@ begin
            rst                => '0',
            trg                => ledTrigLoc,
 
-           streamData         => evrStream.data,
-           streamAddr         => evrStream.addr,
-           streamValid        => evrStream.valid,
+           evrStream          => evrStream,
 
            oclk               => tcsrCLK,
            orst               => tcsrRST,
