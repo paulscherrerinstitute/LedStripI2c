@@ -1,9 +1,10 @@
 # LedStrip Firmware
 
 Extract the pulse-ID from a data stream (input) that 
-originates at an (external) EVR320. Drive two PCA9955
-LED controllers over i2c to display the pulse-ID as a
-binary number (LED bar).
+originates at an embedded EVR320 module (the EVR320
+is not instantiated within this LedStrip module).
+Drive two PCA9955 LED controllers over i2c to display
+the pulse-ID as a binary number (LED bar).
 
 ## Features
 
