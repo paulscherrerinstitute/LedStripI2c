@@ -56,12 +56,15 @@ architecture rtl of LedStripMmioWrapper is
   signal tcsrWR       : std_logic;
   signal tcsrRD       : std_logic;
 
-  signal raddr_w      : unsigned(ADDR_W_G - 2 downto 2);
-  signal waddr_w      : unsigned(ADDR_W_G - 2 downto 2);
+  signal raddr_w      : unsigned(ADDR_W_G - 1 downto 2);
+  signal waddr_w      : unsigned(ADDR_W_G - 1 downto 2);
 
   signal evrStream    : evrStreamType;
 
   signal streamPtr    : unsigned( 2 downto 0 ) := (others => '0');
+
+  constant PULSEID_REG_IDX_C : natural := 15;
+  constant DIVISOR_REG_IDX_C : natural := 14;
 
 begin
 
@@ -71,10 +74,9 @@ begin
   tcsrRD    <= rs and not raddr(ADDR_W_G - 1);
   tcsrWR    <= ws and not waddr(ADDR_W_G - 1);
 
-  rdata     <= tcsrDATR                   when raddr(ADDR_W_G - 1) = '0'  else
-               pulseid(31 downto 0)       when raddr_w             =  0   else
-               std_logic_vector(div_init) when raddr_w             =  1   else
-               (others => '0');
+  rdata     <= pulseid(31 downto 0)       when (raddr_w = PULSEID_REG_IDX_C) else
+               std_logic_vector(div_init) when (raddr_w = DIVISOR_REG_IDX_C) else
+               tcsrDATR;
 
   rst       <= (not rstn);
   tcsrADD   <= waddr when ws = '1' else raddr;
@@ -117,12 +119,12 @@ begin
         else
           div <= div - 1;
         end if;
-        if ( (ws = '1') and (waddr(waddr'left) = '1')  ) then
-          if    ( waddr_w = 0 ) then
+        if ( (ws = '1') ) then
+          if    ( waddr_w = PULSEID_REG_IDX_C ) then
             if ( wstrb = x"f" ) then
               pulseid <= x"0000_0000" & wdata;
             end if;
-          elsif ( waddr_w = 1 ) then
+          elsif ( waddr_w = DIVISOR_REG_IDX_C ) then
             if ( wstrb = x"f" ) then
               div_init <= unsigned(wdata) - 1;
             end if;
