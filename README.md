@@ -6,11 +6,16 @@ and remote-controlled by I2C over a fiber
 connection.
 
  - [kicad/](kicad/)
+
    Kicad design files; [schematics](kicad/ledstrip-sch.pdf) and pcb.
+
  - [hdl/](hdl/)
+
    vhdl code for driving the device from a FPGA
    ([documentation](hdl/README.md)).
+
  - [python/](python/)
+
    python scripts to drive the device from the USB/I2C
    adapter (for testing).
 
