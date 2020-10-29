@@ -141,7 +141,7 @@ begin
       tcsrCLK          => clk,
       tcsrRST          => rst,
 
-      tcsrADD          => tcsrADD(4 downto 2),
+      tcsrADD          => tcsrADD(5 downto 2),
       tcsrDATW         => wdata,
       tcsrWE           => wstrb,
       tcsrDATR         => tcsrDATR,
