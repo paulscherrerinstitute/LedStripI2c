@@ -933,8 +933,6 @@ F 6 "AGILENT TECHNOLOGIES" H 7600 5500 50  0001 L BNN "Field6"
 	1    7600 5500
 	0    -1   -1   0   
 $EndComp
-Wire Wire Line
-	8350 5400 8350 5500
 Connection ~ 8350 5500
 Wire Wire Line
 	8350 5500 8350 5600
@@ -945,12 +943,12 @@ Connection ~ 8350 5700
 $Comp
 L power:GND #PWR09
 U 1 1 5FA4EA4E
-P 8350 6300
-F 0 "#PWR09" H 8350 6050 50  0001 C CNN
-F 1 "GND" H 8355 6127 50  0000 C CNN
-F 2 "" H 8350 6300 50  0001 C CNN
-F 3 "" H 8350 6300 50  0001 C CNN
-	1    8350 6300
+P 8350 6050
+F 0 "#PWR09" H 8350 5800 50  0001 C CNN
+F 1 "GND" H 8355 5877 50  0000 C CNN
+F 2 "" H 8350 6050 50  0001 C CNN
+F 3 "" H 8350 6050 50  0001 C CNN
+	1    8350 6050
 	-1   0    0    -1  
 $EndComp
 $Comp
@@ -1378,8 +1376,6 @@ Wire Wire Line
 Wire Wire Line
 	6650 6150 6650 6250
 Wire Wire Line
-	8350 5700 8350 6300
-Wire Wire Line
 	5000 6550 5000 7200
 $Comp
 L Device:R_Small R6
@@ -1544,4 +1540,28 @@ Text Notes 8850 1950 0    50   Italic 0
 NOTE:\nPCA9955BTW and PCA9955TW differ!\nI2C address strapping is different!\nB:      U2 => 0x69, U3 => 0x05 \nnon-B: U2 => 0x65, U3 => 0x61
 Text Notes 900  3350 0    50   ~ 0
 NOTE:\nFootprint swapped!\nMount from bottom side of PCB!
+Text Notes 7950 6450 0    50   ~ 0
+SDA Optical I/O
+Text Notes 4750 7650 0    50   ~ 0
+SCL Optical I/O
+Wire Wire Line
+	8350 5700 8350 6050
+Text Notes 1550 7350 0    50   ~ 0
+PMOD Connector\n(e.g., for testing with Zynq development board)
+Wire Notes Line style solid rgb(255, 0, 0)
+	850  3050 850  3400
+Wire Notes Line style solid rgb(255, 0, 0)
+	850  3400 2200 3400
+Wire Notes Line style solid rgb(255, 0, 0)
+	2200 3400 2200 3050
+Wire Notes Line style solid rgb(255, 0, 0)
+	2200 3050 850  3050
+Wire Wire Line
+	8350 5450 8350 5500
+Wire Wire Line
+	8350 5400 8350 5500
+Text Notes 850  750  0    118  Italic 0
+I2C-Controlled LED Bar-Graph
+Text Notes 850  1300 0    50   ~ 0
+I2C can be controlled via:\n - optical link (active low: light = logical low)\n - USB (usb-i2c bridge)\n - PMOD connector (fpga development board)\n    I/O voltage from 0.5 - 5.5V\nPower is always supplied from USB connector.
 $EndSCHEMATC
