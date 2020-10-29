@@ -14,7 +14,9 @@ entity LedStripController is
     -- synchronization stages in the SDA/SCL input debouncer
     DBNCE_SYNC_G : natural range 0 to 3         := 3;
     -- for how many cycles to debounce the incoming SDA/SCL signals
-    DBNCE_CYCL_G : natural                      := 10
+    DBNCE_CYCL_G : natural                      := 10;
+    -- period of watchdog for missing strobes; a value of 0 disables the feature
+    WDOGS_CYCL_G : natural                      := 0
   );
   port (
     clk          : in  std_logic;
@@ -33,6 +35,7 @@ entity LedStripController is
     malErrors    : out std_logic_vector(31 downto 0);
     nakErrors    : out std_logic_vector(31 downto 0);
     rbkErrors    : out std_logic_vector(31 downto 0);
+    wdgErrors    : out std_logic_vector(31 downto 0);
 
     sdaDir       : out std_logic;
     sdaOut       : out std_logic;
@@ -135,6 +138,9 @@ architecture rtl of LedStripController is
     briData     :  Slv8;
     rbkCount    :  RbkCountType;
     rbkErrors   :  U32;
+    wdgErrors   :  U32;
+    strobe      :  std_logic;
+    strobeWdog  :  natural range 0 to WDOGS_CYCL_G;
   end record RegType;
 
   constant REG_INIT_C : RegType := (
@@ -148,7 +154,10 @@ architecture rtl of LedStripController is
     briAddr     => LED_IREF_ADDR_C,
     briData     => IREF_INI_C,
     rbkCount    => RbkCountType'high,
-    rbkErrors   => (others => '0')
+    rbkErrors   => (others => '0'),
+    wdgErrors   => (others => '0'),
+    strobe      => '0',
+    strobeWdog  => WDOGS_CYCL_G
   );
 
   procedure setPID(
@@ -240,6 +249,9 @@ begin
     variable off   : PCType;
   begin
     v          := r;
+
+    v.strobe   := strobe;
+
     if ( readbackValid = '1' ) then
       -- incur a bound-check failure during simulation since the combinatorial
       -- process increments v.rbkCount if not checked
@@ -256,6 +268,21 @@ begin
         v.rbkErrors := r.rbkErrors + 1;
       end if;
     end if;
+
+    -- strobe watchdog
+    if ( WDOGS_CYCL_G > 1 ) then
+      if ( (strobe = '1') and (r.strobe = '0') ) then
+        v.strobeWdog := WDOGS_CYCL_G;
+      else
+        if ( r.strobeWdog = 0 ) then
+          v.wdgErrors  := r.wdgErrors + 1;
+          v.strobeWdog := WDOGS_CYCL_G;
+        else
+          v.strobeWdog := r.strobeWdog - 1;
+        end if;
+      end if;
+    end if;
+
     case ( r.state ) is
       when WAIT_READY =>
         if ( progReady = '1' ) then
@@ -369,6 +396,7 @@ begin
   busy                   <= '1' when (r.state /= IDLE) else '0';
 
   rbkErrors              <= std_logic_vector(r.rbkErrors);
+  wdgErrors              <= std_logic_vector(r.wdgErrors);
  
 end architecture rtl;
 
