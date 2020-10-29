@@ -211,7 +211,7 @@ considered: There are two clock-domain crossings in the module
    the (parallel) pulse-ID has stabilized and can be safely read into the `tcslCLK`
    domain. A proper `DATAPATHONLY` constraint should be defined:
 
-    INST "*B_PulseIdExtractor.U_GetPid/r_pulseid_*" TNM = LEDSTRIP_PULSEID_REG;
+    INST "*B_PulseIdExtractor.U_GetPid/rClk_pulseid_*" TNM = LEDSTRIP_PULSEID_REG;
     TIMESPEC TS_<name> = FROM "LEDSTRIP_PULSEID_REG" TO <tnm_of_bus_clock_domain> <delay> DATAPATHONLY;
 
    The user has to provide proper definitions for the items in angled-brackets. The
