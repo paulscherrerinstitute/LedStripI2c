@@ -150,15 +150,17 @@ architecture rtl of LedStripTcsrWrapper is
   constant TCSR_MALERR_IDX_C : natural := 2;
   constant TCSR_NAKERR_IDX_C : natural := 3;
   constant TCSR_RBKERR_IDX_C : natural := 4;
-  constant TCSR_SYNERR_IDX_C : natural := 5;
+  constant TCSR_SEQERR_IDX_C : natural := 5;
   constant TCSR_WDGERR_IDX_C : natural := 6;
   constant TCSR_PIDCNT_IDX_C : natural := 7;
-  constant TCSR_DBG_IDX_C    : natural := 8;
+  constant TCSR_SYNERR_IDX_C : natural := 8;
+  constant TCSR_DBG_IDX_C    : natural := 9;
 
   signal malErrors           : std_logic_vector(31 downto 0);
   signal nakErrors           : std_logic_vector(31 downto 0);
   signal rbkErrors           : std_logic_vector(31 downto 0);
   signal synErrors           : std_logic_vector(31 downto 0);
+  signal seqErrors           : std_logic_vector(31 downto 0);
   signal wdgErrors           : std_logic_vector(31 downto 0);
   signal pulseidCnt          : std_logic_vector(31 downto 0);
   signal dbg                 : std_logic_vector(31 downto 0);
@@ -198,9 +200,10 @@ begin
               malErrors    when (wordAddr = TCSR_MALERR_IDX_C) else
               nakErrors    when (wordAddr = TCSR_NAKERR_IDX_C) else
               rbkErrors    when (wordAddr = TCSR_RBKERR_IDX_C) else
-              synErrors    when (wordAddr = TCSR_SYNERR_IDX_C) else
+              seqErrors    when (wordAddr = TCSR_SEQERR_IDX_C) else
               wdgErrors    when (wordAddr = TCSR_WDGERR_IDX_C) else
               pulseidCnt   when (wordAddr = TCSR_PIDCNT_IDX_C) else
+              synErrors    when (wordAddr = TCSR_SYNERR_IDX_C) else
               dbg;
 
   P_TCSR_WRITE : process ( tcsrCLK ) is
@@ -310,6 +313,7 @@ begin
            pulseid            => pulseid,
            pulseidStrobe      => pulseidValid,
            synErrors          => synErrors,
+           seqErrors          => seqErrors,
            wdgErrors          => wdgErrors,
            pulseidCnt         => pulseidCnt
       );

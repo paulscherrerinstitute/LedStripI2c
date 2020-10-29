@@ -25,13 +25,17 @@ The firmware implements the following features:
 All registers are 32-bit. The address given in this table is
 the register index (= word-address), not a byte address:
 
-| Register   | Access | Function                          |
-|------------|--------|-----------------------------------|
-|  0         | R/W    | Control Register                  |
-|  1         | R/W    | Marker/Mask                       |
-|  2         | RO     | I2C Arbitration Lost Counter      |
-|  3         | RO     | I2C Write Not Acknowledged Counter|
-|  4         | RO     | Readback Error/Mismatch Counter   |
+| Register   | Access | Function                             |
+|------------|--------|--------------------------------------|
+|  0         | R/W    | Control Register                     |
+|  1         | R/W    | Marker/Mask                          |
+|  2         | RO     | I2C Arbitration Lost Counter         |
+|  3         | RO     | I2C Write Not Acknowledged Counter   |
+|  4         | RO     | Readback Error/Mismatch Counter      |
+|  5         | RO     | Pulse-Id Sequence Error Counter      |
+|  6         | RO     | Pulse-Id Watchdog Error Counter      |
+|  7         | RO     | Display-update Trigger Counter       |
+|  8         | RO     | Stream Synchronization Error Counter |
 
 The control register provides the following functionality
 (Defaults marked with 'G' can be changed by setting a VHDL generic)
@@ -111,9 +115,17 @@ The counters keep track of
  - Readback errors. The readback failed or readback data does not match the expected value (e.g.,
    because a glitch on the i2c bus). An unacknowledged transaction error also implies a readback
    error but the converse is not true.
+ - Pulse-Id sequence errors. This counter is incremented when the difference between
+   subsequently received pulse-ids is not 1.
+ - Watchdog errors: Check that a new pulse-ID is received from the EVR stream within 12 ms
+   (this timeout value is a generic setting).
+ - Trigger counter: This counter increments when the display update is triggered (which
+   may happen at a rate that is lower than the pulse-Id update rate if the update trigger
+   inputs are used).
+ - EVR Stream Synchronization Errors. Checks that all bytes corresponding to a pulse-ID are
+   actually received from the EVR stream. 
 
 The readback error counter can be used to ensure that all pulse-IDs have been propagated
-correctly to the display hardware.
-
-
-
+correctly to the display hardware. The watchdog error counter can be used to verify that
+pulse-Ids are received and the sequence error counter can be used to verify that the
+received pulse-Ids are sequential.
