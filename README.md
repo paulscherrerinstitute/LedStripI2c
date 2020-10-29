@@ -7,6 +7,7 @@ connection.
 
  - kicad/    schematics and pcb
  - hdl/      vhdl code for driving the device from a FPGA
+             [see README](hdl/README.md)
  - pythone/  python scripts to drive the device from the USB/I2C
              adapter (for testing).
 
