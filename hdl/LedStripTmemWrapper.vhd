@@ -7,10 +7,10 @@ use work.Evr320StreamPkg.all;
 use work.MpcI2cSequencerPkg.all;
 use work.LedStripWrapperPkg.all;
 
-entity LedStripTcsrWrapper is
+entity LedStripTmemWrapper is
   generic (
-    -- tcsr clock frequence [Hz]
-    TCSR_CLOCK_FRQ_G      : real;
+    -- tmem clock frequence [Hz]
+    TMEM_CLOCK_FRQ_G      : real;
     -- default SCL frequency [Hz]; may change at run-time
     DFLT_I2C_SCL_FRQ_G    : real                          := 400.0E3;
     -- offset in evr stream
@@ -18,7 +18,7 @@ entity LedStripTcsrWrapper is
     -- length in octets
     PULSEID_LENGTH_G      : positive                      :=  8;
     PULSEID_BIGEND_G      : boolean                       := false;
-    -- tcsr and evr clocks are asynchronous
+    -- tmem and evr clocks are asynchronous
     ASYNC_CLOCKS_G        : boolean                       := true;
     -- I2C Address of RHS PCA9955B
     I2C_ADDR_R_G          : std_logic_vector(6 downto 0)  := "0000101";
@@ -26,7 +26,7 @@ entity LedStripTcsrWrapper is
     I2C_ADDR_L_G          : std_logic_vector(6 downto 0)  := "1101001";
     -- Synchronizer stages for reading scalInp/sdaInp
     I2C_SYNC_STAGES_G     : natural range 0 to 3          := 3;
-    -- For how many (tcsr) cycles to debounce sclInp, sdaInp
+    -- For how many (tmem) cycles to debounce sclInp, sdaInp
     I2C_DEBOUNCE_CYCLES_G : natural                       := 10;
     -- V1 has 
     NUM_LEDS_G            : natural range 1 to 32         := 30;
@@ -38,21 +38,22 @@ entity LedStripTcsrWrapper is
     -- Setting this to 0.0 disables the watchdog.
     PULSEID_WDOG_PER_MS_G : real                          := 12.0;
     -- Version (optional git hash)
-    VERSION_G             : std_logic_vector(27 downto 0) := (others => '0')
+    VERSION_G             : std_logic_vector(27 downto 0) := (others => '0');
+    -- left-most bit of TMEM address
+    TMEM_ADDR_MSBIT_G     : natural                       := 23
   );
   port (
-    -- TCSR clock domain
-    tcsrCLK      : in  std_logic;
-    tcsrRST      : in  std_logic;
+    -- TMEM clock domain
+    tmemCLK      : in  std_logic;
+    tmemRST      : in  std_logic;
 
-    tcsrADD      : in  std_logic_vector( 5 downto 2);
-    tcsrDATW     : in  std_logic_vector(31 downto 0);
-    tcsrWE       : in  std_logic_vector( 3 downto 0);
-    tcsrDATR     : out std_logic_vector(31 downto 0);
-    tcsrWR       : in  std_logic;
-    tcsrRD       : in  std_logic;
-    tcsrACK      : out std_logic;
-    tcsrERR      : out std_logic;
+    tmem_IF_ENA  : in  std_logic;
+    tmem_IF_ADD  : in  std_logic_vector(TMEM_ADDR_MSBIT_G downto 3);
+    tmem_IF_DATW : in  std_logic_vector(63 downto 0);
+    tmem_IF_WE   : in  std_logic_vector( 7 downto 0);
+    tmem_IF_DATR : out std_logic_vector(63 downto 0);
+    tmem_IF_BUSY : out std_logic;
+    tmem_IF_PIPE : out std_logic_vector( 1 downto 0);
 
     sclInp       : in  std_logic;
     sclOut       : out std_logic;
@@ -65,13 +66,13 @@ entity LedStripTcsrWrapper is
      -- allows for lower update rates
     ledTrig      : in  std_logic_vector(15 downto 0) := x"0001"
   );
-end entity LedStripTcsrWrapper;
+end entity LedStripTmemWrapper;
 
-architecture rtl of LedStripTcsrWrapper is
+architecture rtl of LedStripTmemWrapper is
 
   constant VERSION_C         : std_logic_vector(31 downto 0) := (VERSION_G & REG_VERSION_C);
-  constant PULSEID_WDOG_P_C  : natural                       := getWdogCount(TCSR_CLOCK_FRQ_G, PULSEID_WDOG_PER_MS_G);
-  constant FDRVAL_C          : std_logic_vector(7 downto 0)  := getFDRVal(TCSR_CLOCK_FRQ_G, DFLT_I2C_SCL_FRQ_G);
+  constant PULSEID_WDOG_P_C  : natural                       := getWdogCount(TMEM_CLOCK_FRQ_G, PULSEID_WDOG_PER_MS_G);
+  constant FDRVAL_C          : std_logic_vector(7 downto 0)  := getFDRVal(TMEM_CLOCK_FRQ_G, DFLT_I2C_SCL_FRQ_G);
 
   constant MARK_DFLT_C       : std_logic_vector(31 downto 0) := setMark(NUM_LEDS_G);
 
@@ -111,13 +112,15 @@ architecture rtl of LedStripTcsrWrapper is
   signal sdaDirLoc           : std_logic;
   signal sdaOutLoc           : std_logic;
 
-  signal wordAddr            : unsigned(tcsrADD'range);
+  signal wordAddr            : unsigned(3 + TCSR_LD_NUM_REGS_C - 1 - 1 downto 3);
 
   signal ledCtrlRst          : std_logic;
 
 begin
 
-  ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tcsrRST );
+  wordAddr   <= unsigned(tmem_IF_ADD(wordAddr'range));
+
+  ledCtrlRst <= (   r.cr( CR_RESET_I_C   ) or tmemRST );
 
   cr32Rbk    <= r.fdr & r.trgMux & r.cr & r.pwm & r.iref;
 
@@ -137,49 +140,54 @@ begin
     pulseid_o <= v;
   end process P_MARK;
 
-  wordAddr <= unsigned(tcsrADD);
-  tcsrDATR <= VERSION_C    when (wordAddr = TCSR_REGVER_IDX_C) else
-              cr32Rbk      when (wordAddr = TCSR_CR_IDX_C    ) else
-              r.mark       when (wordAddr = TCSR_MARK_IDX_C  ) else
-              malErrors    when (wordAddr = TCSR_MALERR_IDX_C) else
-              nakErrors    when (wordAddr = TCSR_NAKERR_IDX_C) else
-              rbkErrors    when (wordAddr = TCSR_RBKERR_IDX_C) else
-              seqErrors    when (wordAddr = TCSR_SEQERR_IDX_C) else
-              wdgErrors    when (wordAddr = TCSR_WDGERR_IDX_C) else
-              pulseidCnt   when (wordAddr = TCSR_PIDCNT_IDX_C) else
-              synErrors    when (wordAddr = TCSR_SYNERR_IDX_C) else
-              dbg;
-
-  P_TCSR_WRITE : process ( tcsrCLK ) is
+  P_TMEM_RW : process ( tmemCLK ) is
   begin
-    if ( rising_edge( tcsrCLK ) ) then
-      if ( tcsrRST = '1' ) then
-        r <= REG_INIT_C;
-      elsif ( tcsrWR = '1' ) then
-        if ( wordAddr = TCSR_CR_IDX_C ) then
-          if ( tcsrWE(3) = '1' ) then
-            r.fdr    <= tcsrDATW(31 downto 24);
+    if ( rising_edge( tmemCLK ) ) then
+      if ( tmemRST = '1' ) then
+        r            <= REG_INIT_C;
+        tmem_IF_DATR <= (others => '0');
+      else
+
+        -- READOUT
+        if    (wordAddr = TCSR_REGVER_IDX_C/2) then
+          tmem_IF_DATR <= cr32Rbk   & VERSION_C;
+        elsif (wordAddr = TCSR_MARK_IDX_C/2  ) then
+          tmem_IF_DATR <= malErrors & r.mark;
+        elsif (wordAddr = TCSR_NAKERR_IDX_C/2) then
+          tmem_IF_DATR <= rbkErrors & nakErrors;
+        elsif (wordAddr = TCSR_SEQERR_IDX_C/2) then
+          tmem_IF_DATR <= wdgErrors & seqErrors;
+        elsif (wordAddr = TCSR_PIDCNT_IDX_C/2) then
+          tmem_IF_DATR <= synErrors & pulseidCnt;
+        else
+          tmem_IF_DATR <= x"0000_0000" & dbg;
+        end if;
+
+        -- WRITE
+        if ( wordAddr = TCSR_REGVER_IDX_C/2 ) then
+          if ( tmem_IF_WE(7) = '1' ) then
+            r.fdr    <= tmem_IF_DATW(63 downto 56);
           end if;
-          if ( tcsrWE(2) = '1' ) then
-            r.trgMux <= tcsrDATW(23 downto 20);
-            r.cr     <= tcsrDATW(19 downto 16);
+          if ( tmem_IF_WE(6) = '1' ) then
+            r.trgMux <= tmem_IF_DATW(55 downto 52);
+            r.cr     <= tmem_IF_DATW(51 downto 48);
           end if;
-          if ( tcsrWE(1) = '1' ) then
-            r.pwm    <= tcsrDATW(15 downto  8);
+          if ( tmem_IF_WE(5) = '1' ) then
+            r.pwm    <= tmem_IF_DATW(47 downto 40);
           end if;
-          if ( tcsrWE(0) = '1' ) then
-            r.iref   <= tcsrDATW( 7 downto  0);
+          if ( tmem_IF_WE(4) = '1' ) then
+            r.iref   <= tmem_IF_DATW(39 downto 32);
           end if;
-        elsif ( wordAddr = TCSR_MARK_IDX_C ) then
-          for i in tcsrWE'range loop
-            if ( tcsrWE(i) = '1' ) then
-              r.mark(8*i + 7 downto 8*i) <= tcsrDATW(8*i + 7 downto 8*i);
+        elsif ( wordAddr = TCSR_MARK_IDX_C/2 ) then
+          for i in 0 to 4 loop
+            if ( tmem_IF_WE(i) = '1' ) then
+              r.mark(8*i + 7 downto 8*i) <= tmem_IF_DATW(8*i + 7 downto 8*i);
             end if;
           end loop;
         end if;
       end if;
     end if;
-  end process P_TCSR_WRITE;
+  end process P_TMEM_RW;
 
   U_LedStrip : entity work.LedStripController
     generic map (
@@ -190,7 +198,7 @@ begin
       DBNCE_CYCL_G          => I2C_DEBOUNCE_CYCLES_G
     )
     port map (
-      clk                   => tcsrCLK,
+      clk                   => tmemCLK,
       rst                   => ledCtrlRst,
 
       strobe                => pulseidValid,
@@ -252,8 +260,8 @@ begin
 
            evrStream          => evrStream,
 
-           oclk               => tcsrCLK,
-           orst               => tcsrRST,
+           oclk               => tmemCLK,
+           orst               => tmemRST,
            pulseid            => pulseid,
            pulseidStrobe      => pulseidValid,
            synErrors          => synErrors,
@@ -264,8 +272,7 @@ begin
 
   end block B_PulseIdExtractor;
 
-  sdaOut  <= '0' when (sdaDirLoc = '1' and sdaOutLoc = '0') else '1';
-
-  tcsrACK <= '1';
-  tcsrERR <= '0';
+  sdaOut       <= '0' when (sdaDirLoc = '1' and sdaOutLoc = '0') else '1';
+  tmem_IF_BUSY <= '0';
+  tmem_IF_PIPE <= "00";
 end architecture rtl;
