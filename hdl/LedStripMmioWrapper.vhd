@@ -3,7 +3,7 @@ use     ieee.std_logic_1164.all;
 use     ieee.numeric_std.all;
 
 use     work.MpcI2cSequencerPkg.all;
-use     work.LedStripTcsrWrapperPkg.all;
+use     work.Evr320StreamPkg.all;
 
 entity LedStripMmioWrapper is
   generic (
