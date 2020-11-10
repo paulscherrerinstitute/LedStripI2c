@@ -211,8 +211,8 @@ considered: There are two clock-domain crossings in the module
    the (parallel) pulse-ID has stabilized and can be safely read into the `tcslCLK`
    domain. A proper `DATAPATHONLY` constraint should be defined:
 
-    INST "*B_PulseIdExtractor.U_GetPid/rClk_pulseid_*" TNM = LEDSTRIP_PULSEID_REG;
-    TIMESPEC TS_<name> = FROM "LEDSTRIP_PULSEID_REG" TO <tnm_of_bus_clock_domain> <delay> DATAPATHONLY;
+       INST "*B_PulseIdExtractor.U_GetPid/rClk_pulseid_*" TNM = LEDSTRIP_PULSEID_REG;
+       TIMESPEC TS_<name> = FROM "LEDSTRIP_PULSEID_REG" TO <tnm_of_bus_clock_domain> <delay> DATAPATHONLY;
 
    The user has to provide proper definitions for the items in angled-brackets. The
    maximum datapath delay should limit any delay to less than the two bus-cycles delay
@@ -222,5 +222,5 @@ considered: There are two clock-domain crossings in the module
    Assuming that this setting remains mostly stable and we don't care about glitches
    during a change of the mux setting we can set a false-path:
 
-    INST "*B_PulseIdExtractor.trgMuxEvr_*"          TNM = LEDSTRIP_MUX_REG;
-    TIMESPEC TS_<name> = FROM <tnm_of_bus_clock_domain> TO "LEDSTRIP_MUX_REG" TIG;
+       INST "*B_PulseIdExtractor.trgMuxEvr_*"          TNM = LEDSTRIP_MUX_REG;
+       TIMESPEC TS_<name> = FROM <tnm_of_bus_clock_domain> TO "LEDSTRIP_MUX_REG" TIG;
