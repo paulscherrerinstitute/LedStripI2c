@@ -179,7 +179,7 @@ begin
             r.iref   <= tmem_IF_DATW(39 downto 32);
           end if;
         elsif ( wordAddr = TCSR_MARK_IDX_C/2 ) then
-          for i in 0 to 4 loop
+          for i in 0 to 3 loop
             if ( tmem_IF_WE(i) = '1' ) then
               r.mark(8*i + 7 downto 8*i) <= tmem_IF_DATW(8*i + 7 downto 8*i);
             end if;
