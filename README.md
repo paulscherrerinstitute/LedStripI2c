@@ -19,6 +19,11 @@ connection.
    python scripts to drive the device from the USB/I2C
    adapter (for testing).
 
+ - [PulseidExtractor/](PulseidExtractor/)
+
+   submodule required to extract the pulse-id from an EVR320
+   stream.
+
 The LED device's I2C bus is accessible by three methods:
 
  - optical (light <-> logic 'low' on I2C bus) 

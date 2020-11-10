@@ -148,6 +148,11 @@ received pulse-Ids are sequential.
 
 The top level entity is defined in [LedStripTcsrWrapper.vhd](LedStripTcsrWrapper.vhd).
 
+### Dependencies
+
+The module requires the [PulseidExtractor](https://github.com/paulscherrerinstitute/PulseIdExtractor.git)
+which is registered as a submodule.
+
 ### Generics
 
 Most of the generics have reasonable default values but a value for the bus frequency must

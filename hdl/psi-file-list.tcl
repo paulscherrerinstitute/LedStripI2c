@@ -1,17 +1,13 @@
 set led_strip_i2c_fw_files { \
   "ioxos_mpc_master_i2c_ctl_pkg.vhd" \
   "MpcI2cSequencerPkg.vhd" \
-  "Evr320StreamPkg.vhd" \
   "LedStripWrapperPkg.vhd" \
   "InpDebouncer.vhd" \
   "ioxos_mpc_master_i2c_ctl.vhd" \
   "MpcI2cSequencer.vhd" \
   "LedStripController.vhd" \
-  "PulseidExtractor.vhd" \
   "LedStripTcsrWrapper.vhd" \
   "LedStripTmemWrapper.vhd" \
-  "PulseidAtomic.vhd" \
-  "PulseidAtomicTmem.vhd" \
 }
 
 set led_strip_i2c_location "[file dirname [info script]]"
