@@ -164,26 +164,28 @@ begin
         end if;
 
         -- WRITE
-        if ( wordAddr = TCSR_REGVER_IDX_C/2 ) then
-          if ( tmem_IF_WE(7) = '1' ) then
-            r.fdr    <= tmem_IF_DATW(63 downto 56);
-          end if;
-          if ( tmem_IF_WE(6) = '1' ) then
-            r.trgMux <= tmem_IF_DATW(55 downto 52);
-            r.cr     <= tmem_IF_DATW(51 downto 48);
-          end if;
-          if ( tmem_IF_WE(5) = '1' ) then
-            r.pwm    <= tmem_IF_DATW(47 downto 40);
-          end if;
-          if ( tmem_IF_WE(4) = '1' ) then
-            r.iref   <= tmem_IF_DATW(39 downto 32);
-          end if;
-        elsif ( wordAddr = TCSR_MARK_IDX_C/2 ) then
-          for i in 0 to 3 loop
-            if ( tmem_IF_WE(i) = '1' ) then
-              r.mark(8*i + 7 downto 8*i) <= tmem_IF_DATW(8*i + 7 downto 8*i);
+        if ( tmem_IF_ENA = '1' ) then
+          if ( wordAddr = TCSR_REGVER_IDX_C/2 ) then
+            if ( tmem_IF_WE(7) = '1' ) then
+              r.fdr    <= tmem_IF_DATW(63 downto 56);
             end if;
-          end loop;
+            if ( tmem_IF_WE(6) = '1' ) then
+              r.trgMux <= tmem_IF_DATW(55 downto 52);
+              r.cr     <= tmem_IF_DATW(51 downto 48);
+            end if;
+            if ( tmem_IF_WE(5) = '1' ) then
+              r.pwm    <= tmem_IF_DATW(47 downto 40);
+            end if;
+            if ( tmem_IF_WE(4) = '1' ) then
+              r.iref   <= tmem_IF_DATW(39 downto 32);
+            end if;
+          elsif ( wordAddr = TCSR_MARK_IDX_C/2 ) then
+            for i in 0 to 3 loop
+              if ( tmem_IF_WE(i) = '1' ) then
+                r.mark(8*i + 7 downto 8*i) <= tmem_IF_DATW(8*i + 7 downto 8*i);
+              end if;
+            end loop;
+          end if;
         end if;
       end if;
     end if;
